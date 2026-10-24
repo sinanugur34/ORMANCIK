@@ -9,6 +9,7 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { speakKidPrompt, speakPraise, stopSpeaking } from '../audio/speakPrompt';
+import { useT } from '../i18n';
 import { LevelDef, starsFromMistakes } from '../data/levels';
 import { AgeBand, colors } from '../theme/colors';
 import { BouncePress } from './Motion';
@@ -36,6 +37,7 @@ function btnSize(band: AgeBand): number {
 }
 
 export function LevelPlay({ level, band, onWin }: Props) {
+  const t = useT();
   const [feedback, setFeedback] = useState<'idle' | 'good' | 'bad'>('idle');
   const [burst, setBurst] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -393,13 +395,13 @@ export function LevelPlay({ level, band, onWin }: Props) {
 
       {level.timerSec ? (
         <View style={styles.timerPill}>
-          <Text style={[styles.timer, seconds < 8 && { color: colors.coral }]}>{seconds} sn</Text>
+          <Text style={[styles.timer, seconds < 8 && { color: colors.coral }]}>{t('common.seconds', { n: seconds })}</Text>
         </View>
       ) : null}
 
       {!softProgress ? (
         <Text style={styles.progress}>
-          {progress}/{need} · +{level.reward} jeton
+          {t('level.progress', { progress, need, reward: level.reward })}
         </Text>
       ) : (
         <View style={styles.dotsRow}>
@@ -417,7 +419,7 @@ export function LevelPlay({ level, band, onWin }: Props) {
           entering={ZoomIn.springify()}
           style={[styles.fb, feedback === 'good' ? styles.fbGood : styles.fbBad]}
         >
-          {feedback === 'good' ? 'Harika!' : 'Tekrar dene'}
+          {feedback === 'good' ? t('level.feedbackGood') : t('level.feedbackBad')}
         </Animated.Text>
       ) : (
         <View style={{ height: 32 }} />
@@ -425,7 +427,7 @@ export function LevelPlay({ level, band, onWin }: Props) {
 
       {level.template === 'colorMatch' ? (
         <View style={styles.grid}>
-          <Text style={styles.targetHint}>Hedef</Text>
+          <Text style={styles.targetHint}>{t('level.target')}</Text>
           <View
             style={[
               styles.swatch,
@@ -535,7 +537,7 @@ export function LevelPlay({ level, band, onWin }: Props) {
 
       {level.template === 'countCollect' ? (
         <View style={styles.grid}>
-          <Text style={styles.targetHint}>{need} tane seç</Text>
+          <Text style={styles.targetHint}>{t('level.pickCount', { n: need })}</Text>
           <View style={styles.row}>
             {[1, 2, 3, 4, 5]
               .slice(0, band === '3-5' ? Math.max(3, need + 1) : Math.max(4, need + 1))
@@ -625,7 +627,7 @@ export function LevelPlay({ level, band, onWin }: Props) {
                 ]}
               >
                 <View style={[styles.binSwatch, { backgroundColor: c }]} />
-                <Text style={styles.binLabel}>{i === activeBin ? 'Buraya' : 'Kutu'}</Text>
+                <Text style={styles.binLabel}>{i === activeBin ? t('level.binHere') : t('level.binBox')}</Text>
               </View>
             ))}
           </View>
@@ -733,7 +735,7 @@ export function LevelPlay({ level, band, onWin }: Props) {
             })}
           </View>
           <Text style={styles.pathHint}>
-            {pathStep + 1}. taşı dokun
+            {t('level.pathHint', { n: pathStep + 1 })}
           </Text>
           <View style={[styles.row, { marginTop: 14 }]}>
             {pathTapOptions.map((c, i) => (
@@ -760,7 +762,7 @@ export function LevelPlay({ level, band, onWin }: Props) {
       {level.template === 'quickFind' ? (
         <View style={styles.grid}>
           <View style={styles.quickTarget}>
-            <Text style={styles.quickTargetLabel}>Hedef</Text>
+            <Text style={styles.quickTargetLabel}>{t('level.target')}</Text>
             <Text style={styles.quickTargetEmoji}>
               {level.animals[0]?.emoji ?? '⭐'}
             </Text>

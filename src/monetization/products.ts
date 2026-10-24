@@ -13,11 +13,13 @@
  * - Coin packs & Premium are optional cosmetics / ads-free.
  * - Every purchase flow must pass ParentalGate in the UI layer.
  */
+/** Product ids & prices. Display labels via `productLabel(key)` / i18n `product.*`. */
 export const PRODUCTS = {
   coins_small: {
     id: 'com.ormancik.coins.small',
     type: 'consumable' as const,
     coins: 80,
+    /** TR fallback — UI should use i18n `product.coins_small`. */
     label: 'Küçük Torba',
     priceLabel: '₺29,99',
   },

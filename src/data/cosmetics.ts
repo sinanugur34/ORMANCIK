@@ -1,8 +1,11 @@
+import { cosmeticName, t } from '../i18n';
+
 export type CosmeticKind = 'outfit' | 'room' | 'pet' | 'fx';
 
 export type Cosmetic = {
   id: string;
   kind: CosmeticKind;
+  /** Display via `displayName()` / `cosmeticName(id)` — TR fallback kept for tooling. */
   name: string;
   emoji: string;
   price: number;
@@ -33,9 +36,27 @@ export const COSMETICS: Cosmetic[] = [
   { id: 'fx-confetti', kind: 'fx', name: 'Konfeti', emoji: '🎉', price: 75 },
 ];
 
+export function displayCosmeticName(c: Cosmetic | string): string {
+  const id = typeof c === 'string' ? c : c.id;
+  return cosmeticName(id);
+}
+
+export function kindLabel(kind: CosmeticKind): string {
+  return t(`cosmetic.kind.${kind}`);
+}
+
+/** @deprecated use kindLabel() — kept for gradual migration */
 export const KIND_LABEL: Record<CosmeticKind, string> = {
-  outfit: 'Kostüm',
-  room: 'Oda',
-  pet: 'Dost',
-  fx: 'Efekt',
+  get outfit() {
+    return t('cosmetic.kind.outfit');
+  },
+  get room() {
+    return t('cosmetic.kind.room');
+  },
+  get pet() {
+    return t('cosmetic.kind.pet');
+  },
+  get fx() {
+    return t('cosmetic.kind.fx');
+  },
 };

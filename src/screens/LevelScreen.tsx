@@ -18,8 +18,9 @@ import { LevelPlay } from '../components/LevelPlay';
 import { BouncePress, FadeInView } from '../components/Motion';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SparkleBurst } from '../components/SparkleBurst';
-import { islandForLevel } from '../data/islands';
+import { displayIslandName, islandForLevel } from '../data/islands';
 import { buildLevel } from '../data/levels';
+import { useT } from '../i18n';
 import { RootStackParamList } from '../navigation/types';
 import { useGame } from '../store/GameContext';
 import { colors } from '../theme/colors';
@@ -43,11 +44,13 @@ function StarRow({ stars }: { stars: 1 | 2 | 3 }) {
 }
 
 export function LevelScreen({ navigation, route }: Props) {
+  const t = useT();
   const { levelId } = route.params;
-  const { ageBand, clearLevel, isLevelUnlocked } = useGame();
+  const { ageBand, clearLevel, isLevelUnlocked, language } = useGame();
   const band = ageBand ?? '3-5';
-  const level = useMemo(() => buildLevel(levelId, band), [levelId, band]);
+  const level = useMemo(() => buildLevel(levelId, band, language), [levelId, band, language]);
   const island = islandForLevel(levelId);
+  const islandLabel = displayIslandName(island);
   const [won, setWon] = useState(false);
   const [stars, setStars] = useState<1 | 2 | 3>(3);
   const pulse = useSharedValue(1);
@@ -59,8 +62,8 @@ export function LevelScreen({ navigation, route }: Props) {
       -1,
       true,
     );
-    void speakKidPrompt('Bravo!');
-  }, [won, pulse]);
+    void speakKidPrompt(t('level.bravo'));
+  }, [won, pulse, t]);
 
   const devamStyle = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }));
 
@@ -68,8 +71,8 @@ export function LevelScreen({ navigation, route }: Props) {
     return (
       <AnimatedBackground>
         <SafeAreaView style={styles.center}>
-          <Text style={styles.lock}>Bu bölüm henüz kilitli</Text>
-          <PrimaryButton label="Haritaya dön" onPress={() => navigation.goBack()} />
+          <Text style={styles.lock}>{t('level.locked')}</Text>
+          <PrimaryButton label={t('level.backMap')} onPress={() => navigation.goBack()} />
         </SafeAreaView>
       </AnimatedBackground>
     );
@@ -80,11 +83,11 @@ export function LevelScreen({ navigation, route }: Props) {
       <SafeAreaView style={{ flex: 1 }}>
         <View style={styles.header}>
           <BouncePress onPress={() => navigation.goBack()} style={styles.back}>
-            <Text style={styles.backText}>← Geri</Text>
+            <Text style={styles.backText}>{t('common.backArrow')}</Text>
           </BouncePress>
           <View style={{ flex: 1 }}>
             <Text style={styles.island}>
-              {island.emoji} {island.name}
+              {island.emoji} {islandLabel}
             </Text>
             <Text style={styles.title}>{level.title}</Text>
           </View>
@@ -109,16 +112,18 @@ export function LevelScreen({ navigation, route }: Props) {
             <LinearGradient colors={[island.accent, colors.forest]} style={styles.modalHero}>
               <SparkleBurst active={won} tone="good" count={16} />
               <Animated.Text entering={FadeIn.delay(80)} style={styles.modalTitle}>
-                Bravo!
+                {t('level.bravo')}
               </Animated.Text>
-              <Text style={styles.modalSub}>{island.name} · +{level.reward} jeton</Text>
+              <Text style={styles.modalSub}>
+                {t('level.rewardSub', { island: islandLabel, reward: level.reward })}
+              </Text>
               <StarRow stars={stars} />
             </LinearGradient>
             <View style={styles.modalActions}>
               {levelId < 80 ? (
                 <Animated.View style={devamStyle}>
                   <PrimaryButton
-                    label="Devam"
+                    label={t('level.continue')}
                     tone="sun"
                     onPress={() => {
                       setWon(false);
@@ -128,7 +133,7 @@ export function LevelScreen({ navigation, route }: Props) {
                 </Animated.View>
               ) : null}
               <PrimaryButton
-                label="Harita"
+                label={t('level.map')}
                 large={false}
                 style={{ marginTop: 12 }}
                 onPress={() => {

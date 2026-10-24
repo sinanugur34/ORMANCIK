@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   FadeIn,
@@ -8,13 +8,16 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { LinearGradient } from 'expo-linear-gradient';
+import { useT } from '../i18n';
 import { colors } from '../theme/colors';
 
-const FRAMES = [
-  { src: require('../../assets/art/hero-grove.jpg'), line: 'Bir koru uyanıyor…' },
-  { src: require('../../assets/art/world-map.jpg'), line: 'Adalar seni çağırıyor' },
-  { src: require('../../assets/art/mascot.jpg'), line: 'Dostun hazır!' },
-];
+const FRAME_SRCS = [
+  require('../../assets/art/hero-grove.jpg'),
+  require('../../assets/art/world-map.jpg'),
+  require('../../assets/art/mascot.jpg'),
+] as const;
+
+const FRAME_KEYS = ['intro.frame1', 'intro.frame2', 'intro.frame3'] as const;
 
 type Props = {
   onDone: () => void;
@@ -22,25 +25,35 @@ type Props = {
 
 /** Short animated “trailer” using crossfading key art (premium feel without a video file). */
 export function CinematicIntro({ onDone }: Props) {
+  const t = useT();
   const [frame, setFrame] = useState(0);
   const progress = useSharedValue(0);
 
+  const frames = useMemo(
+    () =>
+      FRAME_SRCS.map((src, i) => ({
+        src,
+        line: t(FRAME_KEYS[i]!),
+      })),
+    [t],
+  );
+
   useEffect(() => {
-    progress.value = withTiming(1, { duration: FRAMES.length * 1600 });
-    const timers = FRAMES.map((_, i) =>
+    progress.value = withTiming(1, { duration: frames.length * 1600 });
+    const timers = frames.map((_, i) =>
       setTimeout(() => {
-        if (i < FRAMES.length - 1) setFrame(i + 1);
+        if (i < frames.length - 1) setFrame(i + 1);
         else setTimeout(onDone, 700);
       }, (i + 1) * 1600),
     );
     return () => timers.forEach(clearTimeout);
-  }, [onDone, progress]);
+  }, [onDone, progress, frames.length]);
 
   const bar = useAnimatedStyle(() => ({
     width: `${Math.max(8, progress.value * 100)}%`,
   }));
 
-  const current = FRAMES[frame];
+  const current = frames[frame]!;
 
   return (
     <View style={styles.root}>
@@ -57,7 +70,7 @@ export function CinematicIntro({ onDone }: Props) {
         style={styles.grad}
       />
       <View style={styles.copy}>
-        <Text style={styles.brand}>Ormancık</Text>
+        <Text style={styles.brand}>{t('common.brand')}</Text>
         <Animated.Text key={`l-${frame}`} entering={FadeIn} style={styles.line}>
           {current.line}
         </Animated.Text>
@@ -65,7 +78,7 @@ export function CinematicIntro({ onDone }: Props) {
           <Animated.View style={[styles.fill, bar]} />
         </View>
         <Pressable accessibilityRole="button" onPress={onDone} style={styles.skip}>
-          <Text style={styles.skipText}>Atla →</Text>
+          <Text style={styles.skipText}>{t('intro.skip')}</Text>
         </Pressable>
       </View>
     </View>

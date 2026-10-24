@@ -8,7 +8,8 @@ import { BouncePress, FadeInView } from '../components/Motion';
 import { ParentalGate } from '../components/ParentalGate';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { StatusBanner } from '../components/StatusBanner';
-import { COSMETICS, KIND_LABEL, CosmeticKind } from '../data/cosmetics';
+import { COSMETICS, displayCosmeticName, kindLabel, CosmeticKind } from '../data/cosmetics';
+import { productLabel, useT } from '../i18n';
 import { MONETIZATION_COPY, USE_MOCK_MONETIZATION } from '../monetization/config';
 import { REWARDED_COIN_AMOUNT, showRewardedAd } from '../monetization/mockAds';
 import { purchaseCoinPack } from '../monetization/mockIap';
@@ -25,6 +26,7 @@ type GateAction =
   | null;
 
 export function ShopScreen({ navigation }: Props) {
+  const t = useT();
   const {
     coins,
     premium,
@@ -43,19 +45,19 @@ export function ShopScreen({ navigation }: Props) {
   const buyCosmetic = (id: string, price: number) => {
     if (premium || ownedCosmeticIds.includes(id)) {
       equipCosmetic(id);
-      setBanner({ message: 'Takıldı!', tone: 'ok' });
+      setBanner({ message: t('shop.equipped'), tone: 'ok' });
       return;
     }
     if (!spendCoins(price)) {
       setBanner({
-        message: 'Jeton yetmiyor. Bölüm oyna, reklam izle veya jeton paketi al.',
+        message: t('shop.notEnough'),
         tone: 'warn',
       });
       return;
     }
     ownCosmetic(id);
     equipCosmetic(id);
-    setBanner({ message: 'Satın alındı ve takıldı!', tone: 'ok' });
+    setBanner({ message: t('shop.bought'), tone: 'ok' });
   };
 
   const runGateSuccess = async () => {
@@ -68,19 +70,25 @@ export function ShopScreen({ navigation }: Props) {
       if (action.type === 'ad') {
         if (premium) {
           addCoins(REWARDED_COIN_AMOUNT);
-          setBanner({ message: `+${REWARDED_COIN_AMOUNT} jeton (Premium, reklamsız)`, tone: 'ok' });
+          setBanner({
+            message: t('shop.rewardPremium', { n: REWARDED_COIN_AMOUNT }),
+            tone: 'ok',
+          });
         } else {
           const res = await showRewardedAd();
           if (res.rewarded) {
             addCoins(REWARDED_COIN_AMOUNT);
             setBanner({
               message: res.mock
-                ? `+${REWARDED_COIN_AMOUNT} jeton · ${MONETIZATION_COPY.mockAdNote}`
-                : `+${REWARDED_COIN_AMOUNT} jeton`,
+                ? t('shop.rewardMock', {
+                    n: REWARDED_COIN_AMOUNT,
+                    note: MONETIZATION_COPY.mockAdNote,
+                  })
+                : t('shop.rewardOk', { n: REWARDED_COIN_AMOUNT }),
               tone: 'ok',
             });
           } else {
-            setBanner({ message: res.error ?? 'Ödül alınamadı.', tone: 'error' });
+            setBanner({ message: res.error ?? t('shop.rewardFail'), tone: 'error' });
           }
         }
       } else {
@@ -89,8 +97,8 @@ export function ShopScreen({ navigation }: Props) {
           addCoins(res.coins);
           setBanner({
             message: res.mock
-              ? `+${res.coins} jeton · ${MONETIZATION_COPY.mockIapNote}`
-              : `+${res.coins} jeton eklendi`,
+              ? t('shop.rewardMock', { n: res.coins, note: MONETIZATION_COPY.mockIapNote })
+              : t('shop.packOk', { n: res.coins }),
             tone: 'ok',
           });
         } else if (!res.ok) {
@@ -98,7 +106,7 @@ export function ShopScreen({ navigation }: Props) {
         }
       }
     } catch {
-      setBanner({ message: 'Bir hata oluştu. Tekrar dene.', tone: 'error' });
+      setBanner({ message: t('shop.error'), tone: 'error' });
     } finally {
       setBusy(false);
     }
@@ -113,7 +121,7 @@ export function ShopScreen({ navigation }: Props) {
           <BouncePress onPress={() => navigation.goBack()} style={styles.back}>
             <Text style={styles.backText}>←</Text>
           </BouncePress>
-          <Text style={styles.title}>Dükkan</Text>
+          <Text style={styles.title}>{t('shop.title')}</Text>
           <CoinBadge coins={coins} />
         </View>
 
@@ -127,14 +135,12 @@ export function ShopScreen({ navigation }: Props) {
 
           <FadeInView>
             <View style={styles.earnCard}>
-              <Text style={styles.earnTitle}>Jeton kazan</Text>
+              <Text style={styles.earnTitle}>{t('shop.earnTitle')}</Text>
               <Text style={styles.earnSub}>
-                {premium
-                  ? 'Premium: ödül jetonları reklamsız'
-                  : 'Ödüllü reklam (ebeveyn onayı) · zorunlu ara reklam yok'}
+                {premium ? t('shop.earnPremium') : t('shop.earnAd')}
               </Text>
               <PrimaryButton
-                label={busy ? 'Yükleniyor…' : `+${REWARDED_COIN_AMOUNT} jeton`}
+                label={busy ? t('common.loading') : t('shop.earnBtn', { n: REWARDED_COIN_AMOUNT })}
                 tone="sun"
                 disabled={busy}
                 onPress={() => setGate({ type: 'ad' })}
@@ -144,7 +150,7 @@ export function ShopScreen({ navigation }: Props) {
           </FadeInView>
 
           <FadeInView delay={80}>
-            <Text style={styles.section}>Jeton paketleri</Text>
+            <Text style={styles.section}>{t('shop.packs')}</Text>
             <View style={styles.packs}>
               {(Object.keys(PRODUCTS) as Array<keyof typeof PRODUCTS>)
                 .filter((k) => k !== 'premium')
@@ -158,7 +164,7 @@ export function ShopScreen({ navigation }: Props) {
                       onPress={() => setGate({ type: 'pack', key: key as CoinPackKey })}
                     >
                       <Text style={styles.packCoins}>{pack.coins} 🪙</Text>
-                      <Text style={styles.packLabel}>{pack.label}</Text>
+                      <Text style={styles.packLabel}>{productLabel(key)}</Text>
                       <Text style={styles.packPrice}>{pack.priceLabel}</Text>
                     </BouncePress>
                   );
@@ -170,9 +176,9 @@ export function ShopScreen({ navigation }: Props) {
             const items = COSMETICS.filter((c) => c.kind === kind);
             return (
               <FadeInView key={kind} delay={120 + ki * 40}>
-                <Text style={styles.section}>{KIND_LABEL[kind]}</Text>
+                <Text style={styles.section}>{kindLabel(kind)}</Text>
                 {items.length === 0 ? (
-                  <StatusBanner message="Bu kategoride ürün yok." tone="info" />
+                  <StatusBanner message={t('shop.emptyCategory')} tone="info" />
                 ) : (
                   <View style={styles.grid}>
                     {items.map((c) => {
@@ -184,9 +190,13 @@ export function ShopScreen({ navigation }: Props) {
                           onPress={() => buyCosmetic(c.id, c.price)}
                         >
                           <Text style={styles.itemEmoji}>{c.emoji}</Text>
-                          <Text style={styles.itemName}>{c.name}</Text>
+                          <Text style={styles.itemName}>{displayCosmeticName(c)}</Text>
                           <Text style={styles.itemPrice}>
-                            {owned ? 'Tak' : c.price === 0 ? 'Ücretsiz' : `${c.price} 🪙`}
+                            {owned
+                              ? t('shop.equip')
+                              : c.price === 0
+                                ? t('shop.free')
+                                : `${c.price} 🪙`}
                           </Text>
                         </BouncePress>
                       );
@@ -198,7 +208,7 @@ export function ShopScreen({ navigation }: Props) {
           })}
 
           <PrimaryButton
-            label="Premium'a bak"
+            label={t('shop.seePremium')}
             tone="coral"
             onPress={() => navigation.navigate('Premium')}
             style={{ marginTop: 8, marginBottom: 24 }}
@@ -208,7 +218,7 @@ export function ShopScreen({ navigation }: Props) {
 
       <ParentalGate
         visible={!!gate}
-        title={gate?.type === 'ad' ? 'Reklam / ödül onayı' : 'Satın alma onayı'}
+        title={gate?.type === 'ad' ? t('shop.gateAd') : t('shop.gateBuy')}
         onCancel={() => setGate(null)}
         onSuccess={runGateSuccess}
       />

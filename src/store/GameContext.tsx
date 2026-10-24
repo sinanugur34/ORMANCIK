@@ -10,6 +10,7 @@ import React, {
 import { setVoiceNarrationEnabled } from '../audio/speakPrompt';
 import { COSMETICS } from '../data/cosmetics';
 import { TOTAL_LEVELS } from '../data/islands';
+import { setLanguage as setI18nLanguage, t, type Language } from '../i18n';
 import { ageToBand, AgeBand } from '../theme/colors';
 
 const STORAGE_KEY = 'ormancik-v1';
@@ -46,6 +47,8 @@ type DevicePersisted = {
   premium: boolean;
   /** Device-level voice narration preference. */
   voiceEnabled: boolean;
+  /** Device-level UI + TTS language (TR primary, EN L2). */
+  language: Language;
 };
 
 /** Legacy single-age save shape (pre multi-profile). */
@@ -54,6 +57,7 @@ type LegacyPersisted = {
   coins?: number;
   premium?: boolean;
   voiceEnabled?: boolean;
+  language?: Language;
   ownedCosmeticIds?: string[];
   equipped?: Partial<Equipped>;
   clearedLevelIds?: number[];
@@ -77,6 +81,7 @@ type GameContextValue = {
   highestUnlocked: number;
   premium: boolean;
   voiceEnabled: boolean;
+  language: Language;
   ageBand: AgeBand | null;
   createProfile: (name: string, age: number) => ChildProfile | null;
   switchProfile: (id: string) => boolean;
@@ -87,6 +92,7 @@ type GameContextValue = {
   spendCoins: (n: number) => boolean;
   setPremium: (v: boolean) => void;
   setVoiceEnabled: (v: boolean) => void;
+  setLanguage: (lang: Language) => void;
   ownCosmetic: (id: string) => void;
   equipCosmetic: (id: string) => void;
   clearLevel: (levelId: number, reward: number) => void;
@@ -103,11 +109,16 @@ const defaultEquipped: Equipped = {
   fx: null,
 };
 
+function normalizeLanguage(v: unknown): Language {
+  return v === 'en' ? 'en' : 'tr';
+}
+
 const defaultDevice: DevicePersisted = {
   profiles: [],
   activeProfileId: null,
   premium: false,
   voiceEnabled: true,
+  language: 'tr',
 };
 
 function newProfileId(): string {
@@ -129,7 +140,7 @@ function makeProfile(
 ): ChildProfile {
   return {
     id: newProfileId(),
-    name: sanitizeName(name) || 'Oyuncu',
+    name: sanitizeName(name) || t('common.player'),
     age: clampAge(age),
     coins: progress?.coins ?? 40,
     ownedCosmeticIds: progress?.ownedCosmeticIds?.length
@@ -146,7 +157,7 @@ function migrateFromRaw(raw: string): DevicePersisted {
 
   if (Array.isArray(parsed.profiles) && parsed.profiles.length > 0) {
     const profiles = parsed.profiles.slice(0, MAX_PROFILES).map((p) => ({
-      ...makeProfile(p.name || 'Oyuncu', p.age ?? 5, p),
+      ...makeProfile(p.name || t('common.player'), p.age ?? 5, p),
       id: p.id || newProfileId(),
     }));
     const activeProfileId =
@@ -156,12 +167,13 @@ function migrateFromRaw(raw: string): DevicePersisted {
       activeProfileId,
       premium: parsed.premium ?? false,
       voiceEnabled: parsed.voiceEnabled ?? true,
+      language: normalizeLanguage(parsed.language),
     };
   }
 
-  // Legacy single-age → one profile named "Oyuncu"
+  // Legacy single-age → one profile named "Oyuncu" / "Player"
   if (parsed.childAge != null && typeof parsed.childAge === 'number') {
-    const profile = makeProfile('Oyuncu', parsed.childAge, {
+    const profile = makeProfile(t('common.player'), parsed.childAge, {
       coins: parsed.coins,
       ownedCosmeticIds: parsed.ownedCosmeticIds,
       equipped: parsed.equipped as Equipped | undefined,
@@ -173,6 +185,7 @@ function migrateFromRaw(raw: string): DevicePersisted {
       activeProfileId: profile.id,
       premium: parsed.premium ?? false,
       voiceEnabled: parsed.voiceEnabled ?? true,
+      language: normalizeLanguage(parsed.language),
     };
   }
 
@@ -180,6 +193,7 @@ function migrateFromRaw(raw: string): DevicePersisted {
     ...defaultDevice,
     premium: parsed.premium ?? false,
     voiceEnabled: parsed.voiceEnabled ?? true,
+    language: normalizeLanguage(parsed.language),
   };
 }
 
@@ -233,6 +247,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     setVoiceNarrationEnabled(state.voiceEnabled);
   }, [state.voiceEnabled]);
+
+  useEffect(() => {
+    setI18nLanguage(state.language);
+  }, [state.language]);
 
   const activeProfile = useMemo(
     () => state.profiles.find((p) => p.id === state.activeProfileId) ?? null,
@@ -315,6 +333,12 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setState((s) => ({ ...s, voiceEnabled: v }));
   }, []);
 
+  const setLanguage = useCallback((lang: Language) => {
+    const next = normalizeLanguage(lang);
+    setI18nLanguage(next);
+    setState((s) => (s.language === next ? s : { ...s, language: next }));
+  }, []);
+
   const ownCosmetic = useCallback((id: string) => {
     setState((s) =>
       patchActive(s, (p) =>
@@ -392,6 +416,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       highestUnlocked: activeProfile?.highestUnlocked ?? FREE_UNLOCK_COUNT,
       premium: state.premium,
       voiceEnabled: state.voiceEnabled,
+      language: state.language,
       ageBand,
       createProfile,
       switchProfile,
@@ -402,6 +427,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       spendCoins,
       setPremium,
       setVoiceEnabled,
+      setLanguage,
       ownCosmetic,
       equipCosmetic,
       clearLevel,
@@ -413,6 +439,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       state.activeProfileId,
       state.premium,
       state.voiceEnabled,
+      state.language,
       ready,
       activeProfile,
       ageBand,
@@ -425,6 +452,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       spendCoins,
       setPremium,
       setVoiceEnabled,
+      setLanguage,
       ownCosmetic,
       equipCosmetic,
       clearLevel,

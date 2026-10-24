@@ -1,38 +1,30 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimatedBackground } from '../components/AnimatedBackground';
 import { BouncePress, FadeInView } from '../components/Motion';
+import { useT } from '../i18n';
 import { RootStackParamList } from '../navigation/types';
 import { colors } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Privacy'>;
 
-const SECTIONS: { title: string; body: string }[] = [
-  {
-    title: 'Kimler için',
-    body: 'Ormancık 3–10 yaş çocuklar için tasarlanmıştır. Ebeveyn yaş seçer; satın alma, reklam ve yaş değişimi ebeveyn onayı ister.',
-  },
-  {
-    title: 'Topladığımız veriler',
-    body: 'Oyun ilerlemesi, jeton ve kozmetik tercihleri cihazında (AsyncStorage) saklanır. Hesap zorunlu değildir. Çocuk kimliği, konum veya reklam kimliği toplanmaz.',
-  },
-  {
-    title: 'Reklamlar',
-    body: 'Yalnızca ebeveyn onaylı ödüllü reklamlar (isteğe bağlı). Zorunlu ara reklam yok. Davranışsal hedefleme / yeniden pazarlama yok. Üretimde Kids / Families uyumlu reklam SDK kullanılır.',
-  },
-  {
-    title: 'Satın almalar',
-    body: 'Dijital içerik yalnızca Apple App Store / Google Play faturalandırması ile. Bölümler gerçek parayla kilitlenmez. Premium tek seferliktir (reklamsız + kozmetik).',
-  },
-  {
-    title: 'İletişim',
-    body: 'Gizlilik talepleri: privacy@ormancik.app (yayın öncesi gerçek iletişim adresinizle değiştirin). Bu ekran mağaza gönderimi için taslak politikadır; yasal metni avukatınızla kesinleştirin.',
-  },
-];
+const SECTION_KEYS = [
+  { title: 'privacy.s1.title', body: 'privacy.s1.body' },
+  { title: 'privacy.s2.title', body: 'privacy.s2.body' },
+  { title: 'privacy.s3.title', body: 'privacy.s3.body' },
+  { title: 'privacy.s4.title', body: 'privacy.s4.body' },
+  { title: 'privacy.s5.title', body: 'privacy.s5.body' },
+] as const;
 
 export function PrivacyScreen({ navigation }: Props) {
+  const t = useT();
+  const sections = useMemo(
+    () => SECTION_KEYS.map((s) => ({ title: t(s.title), body: t(s.body) })),
+    [t],
+  );
+
   return (
     <AnimatedBackground variant="ocean">
       <SafeAreaView style={{ flex: 1 }}>
@@ -40,21 +32,19 @@ export function PrivacyScreen({ navigation }: Props) {
           <BouncePress onPress={() => navigation.goBack()} style={styles.back}>
             <Text style={styles.backText}>←</Text>
           </BouncePress>
-          <Text style={styles.title}>Gizlilik</Text>
+          <Text style={styles.title}>{t('privacy.title')}</Text>
         </View>
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <FadeInView>
-            <Text style={styles.lead}>
-              Ormancık çocuk güvenliği ve mağaza aile politikalarına uygun olacak şekilde tasarlandı.
-            </Text>
+            <Text style={styles.lead}>{t('privacy.lead')}</Text>
           </FadeInView>
-          {SECTIONS.map((s, i) => (
+          {sections.map((s, i) => (
             <FadeInView key={s.title} delay={60 + i * 40} style={styles.block}>
               <Text style={styles.h}>{s.title}</Text>
               <Text style={styles.p}>{s.body}</Text>
             </FadeInView>
           ))}
-          <Text style={styles.foot}>Son güncelleme: 2026-10-24 · v1.0.0 taslak</Text>
+          <Text style={styles.foot}>{t('privacy.foot')}</Text>
         </ScrollView>
       </SafeAreaView>
     </AnimatedBackground>

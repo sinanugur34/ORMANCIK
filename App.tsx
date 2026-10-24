@@ -14,6 +14,7 @@ import { PrivacyScreen } from './src/screens/PrivacyScreen';
 import { ProfileSetupScreen } from './src/screens/ProfileSetupScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { ShopScreen } from './src/screens/ShopScreen';
+import { useT } from './src/i18n';
 import { GameProvider, useGame } from './src/store/GameContext';
 import { colors } from './src/theme/colors';
 
@@ -33,6 +34,7 @@ const navTheme = {
 
 function RootNav() {
   const { ready, activeProfile } = useGame();
+  const t = useT();
 
   if (!ready) {
     return (
@@ -58,9 +60,11 @@ function RootNav() {
         >
           <ActivityIndicator size="large" color={colors.forest} />
         </View>
-        <Text style={{ color: colors.forestDeep, fontWeight: '900', fontSize: 22 }}>Ormancık</Text>
+        <Text style={{ color: colors.forestDeep, fontWeight: '900', fontSize: 22 }}>
+          {t('common.brand')}
+        </Text>
         <Text style={{ color: colors.muted, fontWeight: '600', textAlign: 'center' }}>
-          Orman hazırlanıyor…
+          {t('app.preparing')}
         </Text>
       </View>
     );

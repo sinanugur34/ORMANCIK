@@ -1,3 +1,4 @@
+import { getLanguage, tFor, type Language } from '../i18n';
 import { AgeBand, palette } from '../theme/colors';
 import { islandForLevel, TOTAL_LEVELS } from './islands';
 
@@ -17,11 +18,16 @@ export type LevelTemplate =
 
 export type ShapeToken = {
   glyph: string;
+  /** i18n key under shape.* */
+  labelKey: string;
+  /** Localized label for the active language (set in buildLevel). */
   label: string;
 };
 
 export type AnimalToken = {
   emoji: string;
+  /** i18n key under animal.* */
+  labelKey: string;
   label: string;
 };
 
@@ -52,27 +58,39 @@ export type LevelDef = {
   findGridSize?: number;
 };
 
-const SHAPE_TOKENS: ShapeToken[] = [
-  { glyph: '●', label: 'Daire' },
-  { glyph: '■', label: 'Kare' },
-  { glyph: '▲', label: 'Üçgen' },
-  { glyph: '★', label: 'Yıldız' },
-  { glyph: '◆', label: 'Elmas' },
-  { glyph: '♥', label: 'Kalp' },
+const SHAPE_DEFS: { glyph: string; labelKey: string }[] = [
+  { glyph: '●', labelKey: 'shape.circle' },
+  { glyph: '■', labelKey: 'shape.square' },
+  { glyph: '▲', labelKey: 'shape.triangle' },
+  { glyph: '★', labelKey: 'shape.star' },
+  { glyph: '◆', labelKey: 'shape.diamond' },
+  { glyph: '♥', labelKey: 'shape.heart' },
 ];
 
-const ANIMAL_TOKENS: AnimalToken[] = [
-  { emoji: '🐱', label: 'Kedi' },
-  { emoji: '🐶', label: 'Köpek' },
-  { emoji: '🐰', label: 'Tavşan' },
-  { emoji: '🐻', label: 'Ayı' },
-  { emoji: '🦊', label: 'Tilki' },
-  { emoji: '🐸', label: 'Kurbağa' },
-  { emoji: '🐼', label: 'Panda' },
-  { emoji: '🐥', label: 'Civciv' },
-  { emoji: '🐷', label: 'Domuz' },
-  { emoji: '🦄', label: 'Unicorn' },
+const ANIMAL_DEFS: { emoji: string; labelKey: string }[] = [
+  { emoji: '🐱', labelKey: 'animal.cat' },
+  { emoji: '🐶', labelKey: 'animal.dog' },
+  { emoji: '🐰', labelKey: 'animal.rabbit' },
+  { emoji: '🐻', labelKey: 'animal.bear' },
+  { emoji: '🦊', labelKey: 'animal.fox' },
+  { emoji: '🐸', labelKey: 'animal.frog' },
+  { emoji: '🐼', labelKey: 'animal.panda' },
+  { emoji: '🐥', labelKey: 'animal.chick' },
+  { emoji: '🐷', labelKey: 'animal.pig' },
+  { emoji: '🦄', labelKey: 'animal.unicorn' },
 ];
+
+function localizeShape(def: { glyph: string; labelKey: string }, lang: Language): ShapeToken {
+  return { glyph: def.glyph, labelKey: def.labelKey, label: tFor(lang, def.labelKey) };
+}
+
+function localizeAnimal(def: { emoji: string; labelKey: string }, lang: Language): AnimalToken {
+  return { emoji: def.emoji, labelKey: def.labelKey, label: tFor(lang, def.labelKey) };
+}
+
+/** Catalog accessors (labels follow active language). */
+export const SHAPE_TOKENS: ShapeToken[] = SHAPE_DEFS.map((d) => localizeShape(d, getLanguage()));
+export const ANIMAL_TOKENS: AnimalToken[] = ANIMAL_DEFS.map((d) => localizeAnimal(d, getLanguage()));
 
 const SIMPLE_TEMPLATES: LevelTemplate[] = [
   'colorMatch',
@@ -238,67 +256,70 @@ function templateFor(levelId: number, band: AgeBand, rng: () => number, tuning: 
   return pool[Math.floor(rng() * pool.length)] ?? pool[0];
 }
 
-const ISLAND_FLAVOR: Record<string, string> = {
-  meadow: 'Çayırda',
-  brook: 'Derede',
-  orchard: 'Bahçede',
-  grove: 'Koruda',
-  hill: 'Tepede',
-  cave: 'Mağarada',
-  shore: 'Kıyıda',
-  star: 'Yıldızda',
-};
+function placeFlavor(islandId: string, lang: Language): string {
+  return tFor(lang, `island.place.${islandId}`) || tFor(lang, 'island.place.grove');
+}
 
 function promptFor(
   template: LevelTemplate,
   islandId: string,
   band: AgeBand,
+  lang: Language,
   extras: { findBigger?: boolean; targetLabel?: string; need?: number },
 ): string {
-  const place = ISLAND_FLAVOR[islandId] ?? 'Koruda';
+  const place = placeFlavor(islandId, lang);
   const soft = band === '3-5';
+  const p = (key: string, params?: Record<string, string | number>) => tFor(lang, key, params);
 
   switch (template) {
     case 'colorMatch':
-      return soft ? `${place} aynı rengi bul!` : `${place} doğru rengi seç`;
+      return soft
+        ? p('level.prompt.colorMatch.soft', { place })
+        : p('level.prompt.colorMatch', { place });
     case 'shapeSort':
       return soft
-        ? `${place} bu şekli bul: ${extras.targetLabel ?? ''}`
-        : `${place} doğru şekli seç`;
+        ? p('level.prompt.shapeSort.soft', { place, target: extras.targetLabel ?? '' })
+        : p('level.prompt.shapeSort', { place });
     case 'sequence':
-      return soft ? 'Sırayı dokun!' : `${place} sırayı takip et`;
+      return soft ? p('level.prompt.sequence.soft') : p('level.prompt.sequence', { place });
     case 'memory':
-      return `${place} eşleri bul`;
+      return p('level.prompt.memory', { place });
     case 'countCollect':
       return soft
-        ? `${extras.need ?? 1} tane bul!`
-        : `${place} ${extras.need ?? 1} taneyi topla`;
+        ? p('level.prompt.countCollect.soft', { need: extras.need ?? 1 })
+        : p('level.prompt.countCollect', { place, need: extras.need ?? 1 });
     case 'sizeCompare':
       return extras.findBigger
         ? soft
-          ? 'Büyük olanı seç!'
-          : `${place} daha büyüğü bul`
+          ? p('level.prompt.sizeBigger.soft')
+          : p('level.prompt.sizeBigger', { place })
         : soft
-          ? 'Küçük olanı seç!'
-          : `${place} daha küçüğü bul`;
+          ? p('level.prompt.sizeSmaller.soft')
+          : p('level.prompt.sizeSmaller', { place });
     case 'patternComplete':
-      return soft ? 'Deseni tamamla!' : `${place} deseni tamamla`;
+      return soft ? p('level.prompt.pattern.soft') : p('level.prompt.pattern', { place });
     case 'tapSort':
-      return soft ? 'Doğru kutuya koy!' : `${place} eşyaları kutulara ayır`;
+      return soft ? p('level.prompt.tapSort.soft') : p('level.prompt.tapSort', { place });
     case 'oddOneOut':
-      return soft ? 'Farklı olanı bul!' : `${place} aykırı olanı bul`;
+      return soft ? p('level.prompt.oddOneOut.soft') : p('level.prompt.oddOneOut', { place });
     case 'animalMatch':
-      return soft ? 'Aynı dostu bul!' : `${place} aynı dostu bul`;
+      return soft
+        ? p('level.prompt.animalMatch.soft')
+        : p('level.prompt.animalMatch', { place });
     case 'pathOrder':
-      return soft ? 'Yolu sırayla takip et!' : `${place} yolu sırayla takip et!`;
+      return soft
+        ? p('level.prompt.pathOrder.soft')
+        : p('level.prompt.pathOrder', { place });
     case 'quickFind':
-      return soft ? 'Hızlıca doğru olanı bul!' : `${place} hızlıca doğru olanı bul!`;
+      return soft
+        ? p('level.prompt.quickFind.soft')
+        : p('level.prompt.quickFind', { place });
     default:
-      return `${place} oyna!`;
+      return p('level.prompt.default', { place });
   }
 }
 
-export function buildLevel(levelId: number, band: AgeBand): LevelDef {
+export function buildLevel(levelId: number, band: AgeBand, lang: Language = getLanguage()): LevelDef {
   const rng = mulberry32(levelId * 997 + band.charCodeAt(0) * 13);
   const island = islandForLevel(levelId);
   const tuning = bandTuning(band, levelId);
@@ -306,7 +327,9 @@ export function buildLevel(levelId: number, band: AgeBand): LevelDef {
   const optionCount = Math.min(tuning.optionCount, 6);
   const targetCount = Math.max(1, Math.min(tuning.targetCount, 5));
   const colors = pick(rng, palette, Math.min(optionCount + 2, palette.length));
-  const shapeTokens = pick(rng, SHAPE_TOKENS, Math.min(optionCount + 1, SHAPE_TOKENS.length));
+  const shapeTokens = pick(rng, SHAPE_DEFS, Math.min(optionCount + 1, SHAPE_DEFS.length)).map((d) =>
+    localizeShape(d, lang),
+  );
   const shapes = shapeTokens.map((s) => s.glyph);
 
   const animalPickN =
@@ -314,8 +337,8 @@ export function buildLevel(levelId: number, band: AgeBand): LevelDef {
       ? band === '3-5'
         ? Math.min(3, Math.max(2, optionCount))
         : Math.min(4, Math.max(3, optionCount))
-      : Math.min(4, ANIMAL_TOKENS.length);
-  const animals = pick(rng, ANIMAL_TOKENS, animalPickN);
+      : Math.min(4, ANIMAL_DEFS.length);
+  const animals = pick(rng, ANIMAL_DEFS, animalPickN).map((d) => localizeAnimal(d, lang));
 
   const findBigger = rng() > 0.45;
   let patternColors: string[] | undefined;
@@ -363,10 +386,12 @@ export function buildLevel(levelId: number, band: AgeBand): LevelDef {
     }
   }
 
+  const islandLabel = tFor(lang, `island.${island.id}`);
+
   return {
     id: levelId,
     islandId: island.id,
-    title: `${island.name} · ${levelId}`,
+    title: tFor(lang, 'level.title', { island: islandLabel, id: levelId }),
     template,
     reward: tuning.reward,
     optionCount,
@@ -381,7 +406,7 @@ export function buildLevel(levelId: number, band: AgeBand): LevelDef {
     patternAnswer,
     pathLength,
     findGridSize,
-    prompt: promptFor(template, island.id, band, {
+    prompt: promptFor(template, island.id, band, lang, {
       findBigger,
       targetLabel: shapeTokens[0]?.label,
       need: targetCount,
@@ -389,8 +414,8 @@ export function buildLevel(levelId: number, band: AgeBand): LevelDef {
   };
 }
 
-export function buildAllLevels(band: AgeBand): LevelDef[] {
-  return Array.from({ length: TOTAL_LEVELS }, (_, i) => buildLevel(i + 1, band));
+export function buildAllLevels(band: AgeBand, lang: Language = getLanguage()): LevelDef[] {
+  return Array.from({ length: TOTAL_LEVELS }, (_, i) => buildLevel(i + 1, band, lang));
 }
 
 /** Cosmetic star rating from mistake count (1–3). */
@@ -405,4 +430,4 @@ export function starsFromMistakes(mistakes: number, band: AgeBand): 1 | 2 | 3 {
   return 1;
 }
 
-export { TOTAL_LEVELS, SHAPE_TOKENS, ANIMAL_TOKENS };
+export { TOTAL_LEVELS };

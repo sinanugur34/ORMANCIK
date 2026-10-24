@@ -2,19 +2,21 @@ import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
 import * as Speech from 'expo-speech';
 import type { Voice } from 'expo-speech';
 import { Platform } from 'react-native';
+import { getLanguage, subscribeLanguage, t, type Language } from '../i18n';
 
 /** Microsoft Edge neural female Turkish — primary kid voice. */
-const EDGE_VOICE = 'tr-TR-EmelNeural';
+const EDGE_VOICE_TR = 'tr-TR-EmelNeural';
+/** Microsoft Edge neural female English. */
+const EDGE_VOICE_EN = 'en-US-JennyNeural';
 
 /** Same-origin Metro proxy (see metro.config.js). */
 const TTS_API_PATH = '/api/tts';
 
-/** Offline / failure fallback: expo-speech pitch when only a male tr voice exists. */
+/** Offline / failure fallback: expo-speech pitch when only a male voice exists. */
 const FALLBACK_FEMALE_PITCH = 1.12;
 const FALLBACK_FEMALE_RATE = 0.8;
 const FALLBACK_MALE_PITCH = 1.4;
 const FALLBACK_MALE_RATE = 0.78;
-const LANGUAGE = 'tr-TR';
 
 const FEMALE_NAME_HINTS = [
   'female',
@@ -28,6 +30,8 @@ const FEMALE_NAME_HINTS = [
   'hazel',
   'zira',
   'samantha',
+  'jenny',
+  'aria',
 ] as const;
 
 const MALE_NAME_HINTS = [
@@ -40,7 +44,7 @@ const MALE_NAME_HINTS = [
   'daniel',
 ] as const;
 
-const PRAISE = ['Harika!', 'Aferin!', 'Bravo!'] as const;
+const PRAISE_KEYS = ['tts.praise.1', 'tts.praise.2', 'tts.praise.3'] as const;
 
 /** Module gate synced from GameContext — default ON. */
 let voiceEnabled = true;
@@ -49,7 +53,7 @@ let voiceEnabled = true;
 let lastPraiseAt = 0;
 const PRAISE_MIN_GAP_MS = 1400;
 
-/** In-memory blob/object URL cache keyed by prompt text. */
+/** In-memory blob/object URL cache keyed by voice|text. */
 const audioUrlCache = new Map<string, string>();
 
 /** In-flight synthesizes so duplicate prompts share one fetch. */
@@ -68,6 +72,21 @@ type ResolvedVoice = {
 };
 
 let cachedFallbackVoice: ResolvedVoice | undefined;
+let cachedFallbackLang: Language | undefined;
+
+subscribeLanguage(() => {
+  cachedFallbackVoice = undefined;
+  cachedFallbackLang = undefined;
+  loggedEngineOnce = false;
+});
+
+export function edgeVoiceFor(lang: Language = getLanguage()): string {
+  return lang === 'en' ? EDGE_VOICE_EN : EDGE_VOICE_TR;
+}
+
+export function speechLocaleFor(lang: Language = getLanguage()): string {
+  return lang === 'en' ? 'en-US' : 'tr-TR';
+}
 
 export function setVoiceNarrationEnabled(enabled: boolean): void {
   voiceEnabled = enabled;
@@ -82,7 +101,7 @@ export function isVoiceNarrationEnabled(): boolean {
 
 /** Selected voice summary for optional Settings display. */
 export function getSelectedVoiceLabel(): string | null {
-  return `${EDGE_VOICE} (Edge neural)`;
+  return `${edgeVoiceFor()} (Edge neural)`;
 }
 
 export async function stopSpeaking(): Promise<void> {
@@ -158,15 +177,20 @@ function ttsApiUrl(): string {
   return `http://127.0.0.1:43123${TTS_API_PATH}`;
 }
 
+function cacheKey(voice: string, text: string): string {
+  return `${voice}|${text}`;
+}
+
 /**
- * Fetch EmelNeural MP3 from the Metro /api/tts proxy and return a playable URI.
- * Cached by exact prompt text so repeats are instant.
+ * Fetch neural MP3 from the Metro /api/tts proxy and return a playable URI.
+ * Cached by voice + exact prompt text so repeats are instant.
  */
-async function synthesizeEdgeUri(text: string): Promise<string> {
-  const cached = audioUrlCache.get(text);
+async function synthesizeEdgeUri(text: string, voice: string): Promise<string> {
+  const key = cacheKey(voice, text);
+  const cached = audioUrlCache.get(key);
   if (cached) return cached;
 
-  const existing = inflightSynth.get(text);
+  const existing = inflightSynth.get(key);
   if (existing) return existing;
 
   const work = (async () => {
@@ -176,14 +200,14 @@ async function synthesizeEdgeUri(text: string): Promise<string> {
       const res = await fetch(ttsApiUrl(), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'audio/mpeg' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, voice }),
         signal: controller.signal,
       });
       if (!res.ok) {
         const detail = await res.text().catch(() => '');
         throw new Error(`TTS HTTP ${res.status} ${detail}`);
       }
-      const voiceHdr = res.headers.get('X-Ormancik-Voice') || EDGE_VOICE;
+      const voiceHdr = res.headers.get('X-Ormancik-Voice') || voice;
       const blob = await res.blob();
       if (!blob || blob.size < 64) {
         throw new Error('TTS returned empty audio');
@@ -207,7 +231,7 @@ async function synthesizeEdgeUri(text: string): Promise<string> {
         uri = `data:audio/mpeg;base64,${globalThis.btoa(binary)}`;
       }
 
-      audioUrlCache.set(text, uri);
+      audioUrlCache.set(key, uri);
       if (!loggedEngineOnce) {
         loggedEngineOnce = true;
         console.log('[speakKidPrompt] engine=edge-tts voice=', voiceHdr, 'female=true');
@@ -215,11 +239,11 @@ async function synthesizeEdgeUri(text: string): Promise<string> {
       return uri;
     } finally {
       clearTimeout(timer);
-      inflightSynth.delete(text);
+      inflightSynth.delete(key);
     }
   })();
 
-  inflightSynth.set(text, work);
+  inflightSynth.set(key, work);
   return work;
 }
 
@@ -282,49 +306,53 @@ function isExplicitlyMale(voice: Voice): boolean {
   return MALE_NAME_HINTS.some((hint) => h.includes(hint));
 }
 
-function isTurkishVoice(voice: { language?: string }): boolean {
-  const lang = (voice.language ?? '').toLowerCase().replace('_', '-');
-  return lang === 'tr' || lang.startsWith('tr-');
+function matchesLocale(voice: { language?: string }, lang: Language): boolean {
+  const code = (voice.language ?? '').toLowerCase().replace('_', '-');
+  if (lang === 'en') return code === 'en' || code.startsWith('en-');
+  return code === 'tr' || code.startsWith('tr-');
 }
 
-async function resolveFallbackVoice(): Promise<ResolvedVoice> {
-  if (cachedFallbackVoice) return cachedFallbackVoice;
+async function resolveFallbackVoice(lang: Language): Promise<ResolvedVoice> {
+  if (cachedFallbackVoice && cachedFallbackLang === lang) return cachedFallbackVoice;
+  const locale = speechLocaleFor(lang);
   try {
     const voices = await Speech.getAvailableVoicesAsync();
-    const turkish = voices.filter(isTurkishVoice);
-    const femaleTr = turkish.find((v) => isExplicitlyFemale(v) && !isExplicitlyMale(v));
-    if (femaleTr) {
+    const pool = voices.filter((v) => matchesLocale(v, lang));
+    const female = pool.find((v) => isExplicitlyFemale(v) && !isExplicitlyMale(v));
+    if (female) {
       cachedFallbackVoice = {
-        identifier: femaleTr.identifier ?? null,
-        name: femaleTr.name,
-        language: femaleTr.language || LANGUAGE,
+        identifier: female.identifier ?? null,
+        name: female.name,
+        language: female.language || locale,
         explicitlyFemale: true,
       };
+      cachedFallbackLang = lang;
       return cachedFallbackVoice;
     }
-    const anyTr = turkish[0];
+    const any = pool[0];
     cachedFallbackVoice = {
-      identifier: anyTr?.identifier ?? null,
-      name: anyTr?.name ?? 'default',
-      language: anyTr?.language || LANGUAGE,
+      identifier: any?.identifier ?? null,
+      name: any?.name ?? 'default',
+      language: any?.language || locale,
       explicitlyFemale: false,
     };
   } catch {
     cachedFallbackVoice = {
       identifier: null,
       name: 'default',
-      language: LANGUAGE,
+      language: locale,
       explicitlyFemale: false,
     };
   }
+  cachedFallbackLang = lang;
   return cachedFallbackVoice;
 }
 
 /** Last-resort OS speech when Edge TTS is offline / unreachable. */
-async function speakWithExpoSpeech(text: string): Promise<void> {
+async function speakWithExpoSpeech(text: string, lang: Language): Promise<void> {
   if (!speechAvailable()) return;
   await Speech.stop();
-  const resolved = await resolveFallbackVoice();
+  const resolved = await resolveFallbackVoice(lang);
   const pitch = resolved.explicitlyFemale ? FALLBACK_FEMALE_PITCH : FALLBACK_MALE_PITCH;
   const rate = resolved.explicitlyFemale ? FALLBACK_FEMALE_RATE : FALLBACK_MALE_RATE;
   console.warn(
@@ -334,7 +362,7 @@ async function speakWithExpoSpeech(text: string): Promise<void> {
     resolved.explicitlyFemale,
   );
   Speech.speak(text, {
-    language: LANGUAGE,
+    language: speechLocaleFor(lang),
     pitch,
     rate,
     ...(resolved.identifier ? { voice: resolved.identifier } : {}),
@@ -343,7 +371,7 @@ async function speakWithExpoSpeech(text: string): Promise<void> {
 }
 
 /**
- * Speak a short kid-friendly Turkish prompt via Edge neural Emel (female).
+ * Speak a short kid-friendly prompt via Edge neural (Emel TR / Jenny EN).
  * Stops any in-flight audio first. Fails silently if muted.
  * Falls back to OS TTS only when Edge synthesis itself is unreachable (offline).
  */
@@ -351,13 +379,16 @@ export async function speakKidPrompt(text: string): Promise<void> {
   const trimmed = text?.trim();
   if (!trimmed || !voiceEnabled) return;
 
+  const lang = getLanguage();
+  const voice = edgeVoiceFor(lang);
+
   let uri: string;
   try {
-    uri = await synthesizeEdgeUri(trimmed);
+    uri = await synthesizeEdgeUri(trimmed, voice);
   } catch (err) {
     console.warn('[speakKidPrompt] edge synth failed:', err);
     try {
-      await speakWithExpoSpeech(trimmed);
+      await speakWithExpoSpeech(trimmed, lang);
     } catch {
       // Fail silently — parental flow must not break if TTS is missing
     }
@@ -365,7 +396,7 @@ export async function speakKidPrompt(text: string): Promise<void> {
   }
 
   try {
-    console.log('[speakKidPrompt]', trimmed, `{voice:${EDGE_VOICE}}`);
+    console.log('[speakKidPrompt]', trimmed, `{voice:${voice}}`);
     await playUri(uri);
   } catch (err) {
     // Autoplay / playback glitch — do not fall back to male OS speech.
@@ -379,6 +410,6 @@ export async function speakPraise(): Promise<void> {
   const now = Date.now();
   if (now - lastPraiseAt < PRAISE_MIN_GAP_MS) return;
   lastPraiseAt = now;
-  const phrase = PRAISE[Math.floor(Math.random() * PRAISE.length)]!;
-  await speakKidPrompt(phrase);
+  const key = PRAISE_KEYS[Math.floor(Math.random() * PRAISE_KEYS.length)]!;
+  await speakKidPrompt(t(key));
 }

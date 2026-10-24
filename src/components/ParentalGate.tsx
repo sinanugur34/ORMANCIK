@@ -7,6 +7,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useT } from '../i18n';
 import { colors } from '../theme/colors';
 
 type Props = {
@@ -18,10 +19,11 @@ type Props = {
 
 export function ParentalGate({
   visible,
-  title = 'Ebeveyn onayı',
+  title,
   onSuccess,
   onCancel,
 }: Props) {
+  const t = useT();
   const challenge = useMemo(() => {
     const a = 4 + Math.floor(Math.random() * 5);
     const b = 3 + Math.floor(Math.random() * 6);
@@ -52,39 +54,39 @@ export function ParentalGate({
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <View style={styles.backdrop}>
         <View style={styles.card}>
-          <Text style={styles.eyebrow}>Yetişkinler için</Text>
-          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.eyebrow}>{t('gate.eyebrow')}</Text>
+          <Text style={styles.title}>{title ?? t('gate.defaultTitle')}</Text>
           <Text style={styles.prompt}>
             {challenge.a} + {challenge.b} = ?
           </Text>
           <TextInput
             value={value}
-            onChangeText={(t) => {
-              setValue(t.replace(/[^0-9]/g, ''));
+            onChangeText={(txt) => {
+              setValue(txt.replace(/[^0-9]/g, ''));
               setError(false);
             }}
             keyboardType="number-pad"
             style={styles.input}
-            placeholder="Cevap"
+            placeholder={t('gate.answerPlaceholder')}
             placeholderTextColor={colors.muted}
             maxLength={3}
             autoFocus
           />
-          {error ? <Text style={styles.error}>Tekrar dene</Text> : null}
+          {error ? <Text style={styles.error}>{t('gate.wrong')}</Text> : null}
           <View style={styles.row}>
             <Pressable
               accessibilityRole="button"
               onPress={onCancel}
               style={({ pressed }) => [styles.btn, styles.ghost, { opacity: pressed ? 0.85 : 1 }]}
             >
-              <Text style={styles.ghostText}>İptal</Text>
+              <Text style={styles.ghostText}>{t('gate.cancel')}</Text>
             </Pressable>
             <Pressable
               accessibilityRole="button"
               onPress={submit}
               style={({ pressed }) => [styles.btn, styles.primary, { opacity: pressed ? 0.85 : 1 }]}
             >
-              <Text style={styles.primaryText}>Onayla</Text>
+              <Text style={styles.primaryText}>{t('gate.confirm')}</Text>
             </Pressable>
           </View>
         </View>

@@ -15,19 +15,21 @@ import { CinematicIntro } from '../components/CinematicIntro';
 import { BouncePress, FadeInView } from '../components/Motion';
 import { ParentalGate } from '../components/ParentalGate';
 import { PrimaryButton } from '../components/PrimaryButton';
+import { useT } from '../i18n';
 import { RootStackParamList } from '../navigation/types';
 import { MAX_PROFILES, PROFILE_NAME_MAX, useGame } from '../store/GameContext';
 import { ageToBand, colors } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ProfileSetup'>;
 
-const BANDS: { id: '3-5' | '6-8' | '9-10'; title: string; hint: string; ages: number[] }[] = [
-  { id: '3-5', title: 'Küçük kaşif', hint: 'Büyük düğmeler · az seçenek', ages: [3, 4, 5] },
-  { id: '6-8', title: 'Orman gezgini', hint: 'Orta zorluk · daha çok oyun', ages: [6, 7, 8] },
-  { id: '9-10', title: 'Koru ustası', hint: 'Daha zor · zamanlı turlar', ages: [9, 10] },
+const BAND_IDS = [
+  { id: '3-5' as const, ages: [3, 4, 5] },
+  { id: '6-8' as const, ages: [6, 7, 8] },
+  { id: '9-10' as const, ages: [9, 10] },
 ];
 
 export function ProfileSetupScreen({ navigation, route }: Props) {
+  const t = useT();
   const { createProfile, profiles } = useGame();
   const mode = route.params?.mode ?? (profiles.length === 0 ? 'first' : 'add');
   const isAdd = mode === 'add';
@@ -45,8 +47,18 @@ export function ProfileSetupScreen({ navigation, route }: Props) {
   const canSubmit = nameOk && (isAdd ? canAdd : true);
 
   const title = useMemo(
-    () => (isAdd ? 'Yeni çocuk profili' : 'Çocuğunun profili'),
-    [isAdd],
+    () => (isAdd ? t('profile.titleAdd') : t('profile.titleFirst')),
+    [isAdd, t],
+  );
+
+  const bands = useMemo(
+    () =>
+      BAND_IDS.map((b) => ({
+        ...b,
+        title: t(`profile.band.${b.id}.title`),
+        hint: t(`profile.band.${b.id}.hint`),
+      })),
+    [t],
   );
 
   const confirm = () => {
@@ -76,9 +88,9 @@ export function ProfileSetupScreen({ navigation, route }: Props) {
         />
         <SafeAreaView style={styles.heroSafe}>
           <FadeInView>
-            <Text style={styles.brand}>Ormancık</Text>
+            <Text style={styles.brand}>{t('common.brand')}</Text>
             <Text style={styles.tagline}>
-              {isAdd ? 'İkinci (veya yeni) kaşif ekle' : 'İsme ve yaşa göre yumuşak bir macera'}
+              {isAdd ? t('profile.taglineAdd') : t('profile.taglineFirst')}
             </Text>
           </FadeInView>
         </SafeAreaView>
@@ -92,16 +104,14 @@ export function ProfileSetupScreen({ navigation, route }: Props) {
       >
         <FadeInView delay={80}>
           <Text style={styles.label}>{title}</Text>
-          <Text style={styles.hint}>
-            İsim ve yaş, oyun zorluğunu ve karşılama metnini belirler.
-          </Text>
+          <Text style={styles.hint}>{t('profile.hint')}</Text>
         </FadeInView>
 
-        <Text style={styles.fieldLabel}>İsim</Text>
+        <Text style={styles.fieldLabel}>{t('profile.nameLabel')}</Text>
         <TextInput
           value={name}
-          onChangeText={(t) => setName(t.slice(0, PROFILE_NAME_MAX))}
-          placeholder="Çocuğunun adı"
+          onChangeText={(txt) => setName(txt.slice(0, PROFILE_NAME_MAX))}
+          placeholder={t('profile.namePlaceholder')}
           placeholderTextColor={colors.muted}
           style={styles.nameInput}
           maxLength={PROFILE_NAME_MAX}
@@ -113,9 +123,9 @@ export function ProfileSetupScreen({ navigation, route }: Props) {
           {name.trim().length}/{PROFILE_NAME_MAX}
         </Text>
 
-        <Text style={[styles.fieldLabel, { marginTop: 8 }]}>Yaş</Text>
+        <Text style={[styles.fieldLabel, { marginTop: 8 }]}>{t('profile.ageLabel')}</Text>
         <View style={styles.bandCol}>
-          {BANDS.map((b) => {
+          {bands.map((b) => {
             const active = band === b.id;
             return (
               <View key={b.id} style={[styles.bandCard, active && styles.bandCardOn]}>
@@ -141,13 +151,13 @@ export function ProfileSetupScreen({ navigation, route }: Props) {
         </View>
 
         {isAdd && !canAdd ? (
-          <Text style={styles.warn}>En fazla {MAX_PROFILES} çocuk profili eklenebilir.</Text>
+          <Text style={styles.warn}>{t('profile.warnMax', { n: MAX_PROFILES })}</Text>
         ) : null}
 
         <View style={styles.actions}>
           {isAdd ? (
             <PrimaryButton
-              label="Vazgeç"
+              label={t('common.cancel')}
               tone="coral"
               large={false}
               onPress={() => navigation.goBack()}
@@ -155,7 +165,7 @@ export function ProfileSetupScreen({ navigation, route }: Props) {
             />
           ) : null}
           <PrimaryButton
-            label={isAdd ? 'Profili kaydet' : 'Başla'}
+            label={isAdd ? t('profile.save') : t('common.start')}
             onPress={() => setGate(true)}
             disabled={!canSubmit}
             style={{ flex: 1, marginTop: isAdd ? 0 : 8 }}
@@ -165,7 +175,7 @@ export function ProfileSetupScreen({ navigation, route }: Props) {
 
       <ParentalGate
         visible={gate}
-        title={isAdd ? 'Yeni profil için ebeveyn onayı' : 'Profili kaydetmek için onay'}
+        title={isAdd ? t('profile.gateAdd') : t('profile.gateFirst')}
         onCancel={() => setGate(false)}
         onSuccess={() => {
           setGate(false);

@@ -35,8 +35,9 @@ function sendCors(res) {
 }
 
 /**
- * Same-origin Edge TTS proxy so the web client can play tr-TR-EmelNeural
- * (browsers cannot open the Edge TTS WebSocket themselves).
+ * Same-origin Edge TTS proxy so the web client can play neural voices
+ * (tr-TR-EmelNeural / en-US-JennyNeural). Browsers cannot open the Edge
+ * TTS WebSocket themselves.
  */
 config.server = {
   ...config.server,
@@ -57,17 +58,21 @@ config.server = {
 
       (async () => {
         let text = '';
+        let voiceHint = '';
         if (req.method === 'POST') {
           const raw = await readBody(req);
           try {
             const parsed = JSON.parse(raw || '{}');
             text = String(parsed.text ?? '');
+            voiceHint = String(parsed.voice ?? parsed.lang ?? '');
           } catch {
             text = '';
           }
         } else {
           const q = url.includes('?') ? url.slice(url.indexOf('?') + 1) : '';
-          text = String(new URLSearchParams(q).get('text') ?? '');
+          const params = new URLSearchParams(q);
+          text = String(params.get('text') ?? '');
+          voiceHint = String(params.get('voice') ?? params.get('lang') ?? '');
         }
 
         text = text.trim();
@@ -78,15 +83,16 @@ config.server = {
           return;
         }
 
-        const { synthesizeToFile, EDGE_VOICE, cacheKey } = await loadSynth();
-        const file = await synthesizeToFile(text);
+        const { synthesizeToFile, resolveVoice, cacheKey } = await loadSynth();
+        const voice = resolveVoice(voiceHint);
+        const file = await synthesizeToFile(text, { voice });
         const buf = fs.readFileSync(file);
 
         res.statusCode = 200;
         res.setHeader('Content-Type', 'audio/mpeg');
         res.setHeader('Cache-Control', 'public, max-age=86400');
-        res.setHeader('X-Ormancik-Voice', EDGE_VOICE);
-        res.setHeader('X-Ormancik-Cache-Key', cacheKey(text));
+        res.setHeader('X-Ormancik-Voice', voice);
+        res.setHeader('X-Ormancik-Cache-Key', cacheKey(text, voice));
         res.setHeader('Content-Length', String(buf.length));
         res.end(buf);
       })().catch((err) => {

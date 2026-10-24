@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import { USE_MOCK_MONETIZATION } from './config';
 import { CoinPackKey, PRODUCTS } from './products';
 
@@ -17,7 +18,7 @@ export type PurchaseResult =
  */
 export async function purchaseCoinPack(key: CoinPackKey): Promise<PurchaseResult> {
   if (!USE_MOCK_MONETIZATION) {
-    return { ok: false, reason: 'Üretim IAP henüz bağlanmadı.', mock: false };
+    return { ok: false, reason: t('money.iapMissing'), mock: false };
   }
   await new Promise((r) => setTimeout(r, 700));
   const pack = PRODUCTS[key];
@@ -26,7 +27,7 @@ export async function purchaseCoinPack(key: CoinPackKey): Promise<PurchaseResult
 
 export async function purchasePremium(): Promise<PurchaseResult> {
   if (!USE_MOCK_MONETIZATION) {
-    return { ok: false, reason: 'Üretim IAP henüz bağlanmadı.', mock: false };
+    return { ok: false, reason: t('money.iapMissing'), mock: false };
   }
   await new Promise((r) => setTimeout(r, 800));
   return {

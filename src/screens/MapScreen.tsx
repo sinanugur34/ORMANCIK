@@ -11,7 +11,8 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { CoinBadge } from '../components/CoinBadge';
 import { BouncePress, FadeInView } from '../components/Motion';
-import { ISLANDS } from '../data/islands';
+import { displayIslandName, ISLANDS } from '../data/islands';
+import { useT } from '../i18n';
 import { RootStackParamList } from '../navigation/types';
 import { useGame } from '../store/GameContext';
 import { colors } from '../theme/colors';
@@ -19,6 +20,7 @@ import { colors } from '../theme/colors';
 type Props = NativeStackScreenProps<RootStackParamList, 'Map'>;
 
 export function MapScreen({ navigation }: Props) {
+  const t = useT();
   const { coins, clearedLevelIds, isLevelUnlocked, highestUnlocked } = useGame();
 
   return (
@@ -28,11 +30,11 @@ export function MapScreen({ navigation }: Props) {
         <SafeAreaView edges={['top']}>
           <View style={styles.bannerBar}>
             <BouncePress onPress={() => navigation.goBack()} style={styles.back}>
-              <Text style={styles.backText}>← Geri</Text>
+              <Text style={styles.backText}>{t('common.backArrow')}</Text>
             </BouncePress>
             <View style={{ flex: 1 }}>
-              <Text style={styles.title}>Dünya Haritası</Text>
-              <Text style={styles.sub}>Açık: {highestUnlocked} / 80</Text>
+              <Text style={styles.title}>{t('map.title')}</Text>
+              <Text style={styles.sub}>{t('map.unlocked', { n: highestUnlocked })}</Text>
             </View>
             <CoinBadge coins={coins} />
           </View>
@@ -48,9 +50,9 @@ export function MapScreen({ navigation }: Props) {
               <View style={[styles.islandHead, { backgroundColor: island.accent }]}>
                 <Text style={styles.islandEmoji}>{island.emoji}</Text>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.islandName}>{island.name}</Text>
+                  <Text style={styles.islandName}>{displayIslandName(island)}</Text>
                   <Text style={styles.islandProg}>
-                    {cleared}/{island.levelCount} tamam
+                    {t('map.done', { cleared, total: island.levelCount })}
                   </Text>
                 </View>
               </View>

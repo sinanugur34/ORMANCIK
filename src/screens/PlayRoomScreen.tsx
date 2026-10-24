@@ -7,6 +7,7 @@ import { GroveMascot } from '../components/GroveMascot';
 import { BouncePress, FadeInView } from '../components/Motion';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { COSMETICS } from '../data/cosmetics';
+import { useT } from '../i18n';
 import { RootStackParamList } from '../navigation/types';
 import { useGame } from '../store/GameContext';
 import { colors } from '../theme/colors';
@@ -21,6 +22,7 @@ const ROOM_ART: Record<string, number> = {
 };
 
 export function PlayRoomScreen({ navigation }: Props) {
+  const t = useT();
   const { equipped, ownedCosmeticIds, premium, equipCosmetic } = useGame();
 
   const outfit = COSMETICS.find((c) => c.id === equipped.outfit);
@@ -48,7 +50,7 @@ export function PlayRoomScreen({ navigation }: Props) {
             <BouncePress onPress={() => navigation.goBack()} style={styles.back}>
               <Text style={styles.backText}>←</Text>
             </BouncePress>
-            <Text style={styles.title}>Oyun Odası</Text>
+            <Text style={styles.title}>{t('playRoom.title')}</Text>
             <BouncePress onPress={() => navigation.navigate('Shop')} style={styles.back}>
               <Text style={{ fontSize: 18 }}>🛍️</Text>
             </BouncePress>
@@ -61,13 +63,13 @@ export function PlayRoomScreen({ navigation }: Props) {
               petEmoji={pet?.emoji}
               fxEmoji={fx?.emoji}
             />
-            <Text style={styles.caption}>Dokun, giydir, oyna</Text>
+            <Text style={styles.caption}>{t('playRoom.caption')}</Text>
           </FadeInView>
 
           <View style={styles.tray}>
-            <Text style={styles.trayLabel}>Kostümler</Text>
+            <Text style={styles.trayLabel}>{t('playRoom.outfits')}</Text>
             {ownedOutfits.length === 0 ? (
-              <Text style={styles.empty}>Henüz kostüm yok — dükkandan alabilirsin.</Text>
+              <Text style={styles.empty}>{t('playRoom.empty')}</Text>
             ) : (
               <View style={styles.trayRow}>
                 {ownedOutfits.map((c) => (
@@ -82,7 +84,7 @@ export function PlayRoomScreen({ navigation }: Props) {
               </View>
             )}
             <PrimaryButton
-              label="Dükkana git"
+              label={t('playRoom.goShop')}
               tone="coral"
               style={{ marginTop: 14 }}
               onPress={() => navigation.navigate('Shop')}

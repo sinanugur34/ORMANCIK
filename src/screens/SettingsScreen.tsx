@@ -7,6 +7,8 @@ import { BouncePress, FadeInView } from '../components/Motion';
 import { ParentalGate } from '../components/ParentalGate';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { StatusBanner } from '../components/StatusBanner';
+import type { Language } from '../i18n';
+import { useT } from '../i18n';
 import { MONETIZATION_COPY, USE_MOCK_MONETIZATION } from '../monetization/config';
 import { restorePurchases } from '../monetization/mockIap';
 import { RootStackParamList } from '../navigation/types';
@@ -26,6 +28,7 @@ type GateKind =
   | null;
 
 export function SettingsScreen({ navigation }: Props) {
+  const t = useT();
   const {
     childAge,
     childName,
@@ -38,6 +41,8 @@ export function SettingsScreen({ navigation }: Props) {
     setPremium,
     voiceEnabled,
     setVoiceEnabled,
+    language,
+    setLanguage,
     resetProgress,
     ownCosmetic,
   } = useGame();
@@ -61,7 +66,7 @@ export function SettingsScreen({ navigation }: Props) {
 
     if (kind.type === 'age') {
       updateActiveAge(ageDraft);
-      setBanner({ message: `Yaş ${ageDraft} olarak kaydedildi.`, tone: 'ok' });
+      setBanner({ message: t('settings.ageSaved', { age: ageDraft }), tone: 'ok' });
       return;
     }
 
@@ -73,7 +78,7 @@ export function SettingsScreen({ navigation }: Props) {
     if (kind.type === 'delete') {
       const ok = deleteProfile(kind.id);
       setBanner({
-        message: ok ? 'Profil silindi.' : 'Profil silinemedi. En az bir profil kalmalı.',
+        message: ok ? t('settings.deleted') : t('settings.deleteFail'),
         tone: ok ? 'ok' : 'error',
       });
       return;
@@ -81,7 +86,7 @@ export function SettingsScreen({ navigation }: Props) {
 
     if (kind.type === 'reset') {
       resetProgress();
-      setBanner({ message: 'İlerleme sıfırlandı. Profil kurulumuna dönülüyor.', tone: 'info' });
+      setBanner({ message: t('settings.resetDone'), tone: 'info' });
       navigation.reset({ index: 0, routes: [{ name: 'ProfileSetup' }] });
       return;
     }
@@ -93,17 +98,17 @@ export function SettingsScreen({ navigation }: Props) {
         setPremium(true);
         const { COSMETICS } = await import('../data/cosmetics');
         COSMETICS.forEach((c) => ownCosmetic(c.id));
-        setBanner({ message: 'Premium geri yüklendi.', tone: 'ok' });
+        setBanner({ message: t('premium.restored'), tone: 'ok' });
       } else {
         setBanner({
           message: USE_MOCK_MONETIZATION
-            ? 'Demo: geri yüklenecek satın alma yok.'
-            : 'Geri yüklenecek satın alma bulunamadı.',
+            ? t('premium.restoreEmptyMock')
+            : t('premium.restoreEmpty'),
           tone: 'info',
         });
       }
     } catch {
-      setBanner({ message: 'Geri yükleme başarısız. Tekrar dene.', tone: 'error' });
+      setBanner({ message: t('settings.restoreFail'), tone: 'error' });
     } finally {
       setBusy(false);
     }
@@ -111,34 +116,39 @@ export function SettingsScreen({ navigation }: Props) {
 
   const gateTitle =
     gate?.type === 'age'
-      ? 'Yaş değiştirme onayı'
+      ? t('settings.gateAge')
       : gate?.type === 'restore'
-        ? 'Satın alma geri yükleme'
+        ? t('settings.gateRestore')
         : gate?.type === 'add'
-          ? 'Yeni çocuk ekleme onayı'
+          ? t('settings.gateAdd')
           : gate?.type === 'delete'
-            ? 'Profil silme onayı'
-            : 'İlerlemeyi sıfırla';
+            ? t('settings.gateDelete')
+            : t('settings.gateReset');
 
   const pendingSwitch = profiles.find((p) => p.id === switchConfirmId) ?? null;
   const pendingDelete = profiles.find((p) => p.id === deleteConfirmId) ?? null;
 
   const confirmSwitch = () => {
     if (!switchConfirmId) return;
-    const name = profiles.find((p) => p.id === switchConfirmId)?.name ?? 'kaşif';
+    const name = profiles.find((p) => p.id === switchConfirmId)?.name ?? t('common.explorer');
     const ok = switchProfile(switchConfirmId);
     setSwitchConfirmId(null);
     if (ok) {
-      setBanner({ message: `Şimdi oynayan: ${name}`, tone: 'ok' });
+      setBanner({ message: t('settings.nowPlaying', { name }), tone: 'ok' });
     }
   };
 
   const requestDelete = (id: string) => {
     if (profiles.length <= 1) {
-      setBanner({ message: 'En az bir çocuk profili kalmalı.', tone: 'info' });
+      setBanner({ message: t('settings.keepOne'), tone: 'info' });
       return;
     }
     setDeleteConfirmId(id);
+  };
+
+  const pickLanguage = (lang: Language) => {
+    if (lang === language) return;
+    setLanguage(lang);
   };
 
   return (
@@ -148,7 +158,7 @@ export function SettingsScreen({ navigation }: Props) {
           <BouncePress onPress={() => navigation.goBack()} style={styles.back}>
             <Text style={styles.backText}>←</Text>
           </BouncePress>
-          <Text style={styles.title}>Ayarlar</Text>
+          <Text style={styles.title}>{t('settings.title')}</Text>
         </View>
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -160,9 +170,30 @@ export function SettingsScreen({ navigation }: Props) {
           ) : null}
 
           <FadeInView style={styles.card}>
-            <Text style={styles.h}>Çocuklar</Text>
+            <Text style={styles.h}>{t('settings.language')}</Text>
+            <Text style={styles.sub}>{t('settings.languageSub')}</Text>
+            <View style={styles.langRow}>
+              {(['tr', 'en'] as Language[]).map((lang) => {
+                const on = language === lang;
+                return (
+                  <BouncePress
+                    key={lang}
+                    onPress={() => pickLanguage(lang)}
+                    style={[styles.langBtn, on && styles.langBtnOn]}
+                  >
+                    <Text style={[styles.langText, on && styles.langTextOn]}>
+                      {t(`settings.lang.${lang}`)}
+                    </Text>
+                  </BouncePress>
+                );
+              })}
+            </View>
+          </FadeInView>
+
+          <FadeInView delay={40} style={styles.card}>
+            <Text style={styles.h}>{t('settings.kids')}</Text>
             <Text style={styles.sub}>
-              Aktif: {childName ?? '—'} · En fazla {MAX_PROFILES} profil. Ekleme/silme ebeveyn onayı ister.
+              {t('settings.kidsSub', { name: childName ?? '—', max: MAX_PROFILES })}
             </Text>
             <View style={styles.profileList}>
               {profiles.map((p) => {
@@ -180,8 +211,11 @@ export function SettingsScreen({ navigation }: Props) {
                         {p.name}
                       </Text>
                       <Text style={styles.profileMeta}>
-                        Yaş {p.age} · {p.coins} 🪙 · {p.clearedLevelIds.length} bölüm
-                        {active ? ' · aktif' : ''}
+                        {t(active ? 'settings.profileMetaActive' : 'settings.profileMeta', {
+                          age: p.age,
+                          coins: p.coins,
+                          levels: p.clearedLevelIds.length,
+                        })}
                       </Text>
                     </BouncePress>
                     {profiles.length > 1 ? (
@@ -189,7 +223,7 @@ export function SettingsScreen({ navigation }: Props) {
                         onPress={() => requestDelete(p.id)}
                         style={styles.deleteBtn}
                       >
-                        <Text style={styles.deleteText}>Sil</Text>
+                        <Text style={styles.deleteText}>{t('settings.delete')}</Text>
                       </BouncePress>
                     ) : null}
                   </View>
@@ -197,7 +231,7 @@ export function SettingsScreen({ navigation }: Props) {
               })}
             </View>
             <PrimaryButton
-              label="Yeni çocuk ekle"
+              label={t('settings.addChild')}
               tone="sky"
               onPress={() => setGate({ type: 'add' })}
               disabled={profiles.length >= MAX_PROFILES}
@@ -205,26 +239,24 @@ export function SettingsScreen({ navigation }: Props) {
             />
           </FadeInView>
 
-          <FadeInView delay={40} style={styles.card}>
-            <Text style={styles.h}>Sesli yönergeler</Text>
-            <Text style={styles.sub}>
-              Seviye talimatları ve kısa övgüler sesli okunur. Varsayılan: açık. (Cihaz geneli)
-            </Text>
+          <FadeInView delay={80} style={styles.card}>
+            <Text style={styles.h}>{t('settings.voice')}</Text>
+            <Text style={styles.sub}>{t('settings.voiceSub')}</Text>
             <BouncePress
               onPress={() => setVoiceEnabled(!voiceEnabled)}
               style={[styles.toggleRow, voiceEnabled ? styles.toggleOn : styles.toggleOff]}
             >
               <Text style={[styles.toggleLabel, voiceEnabled && styles.toggleLabelOn]}>
-                {voiceEnabled ? 'Açık' : 'Kapalı'}
+                {voiceEnabled ? t('common.on') : t('common.off')}
               </Text>
               <View style={[styles.toggleKnob, voiceEnabled && styles.toggleKnobOn]} />
             </BouncePress>
           </FadeInView>
 
-          <FadeInView delay={80} style={styles.card}>
-            <Text style={styles.h}>Aktif çocuğun yaşı</Text>
+          <FadeInView delay={120} style={styles.card}>
+            <Text style={styles.h}>{t('settings.age')}</Text>
             <Text style={styles.sub}>
-              Değişiklik ebeveyn onayı ister. Şu an: {childName ?? '—'} · yaş {childAge ?? '—'}
+              {t('settings.ageSub', { name: childName ?? '—', age: childAge ?? '—' })}
             </Text>
             <View style={styles.grid}>
               {AGES.map((a) => {
@@ -241,20 +273,23 @@ export function SettingsScreen({ navigation }: Props) {
               })}
             </View>
             <PrimaryButton
-              label="Yaşı kaydet"
+              label={t('settings.saveAge')}
               onPress={() => setGate({ type: 'age' })}
               disabled={ageDraft === childAge}
               style={{ marginTop: 8 }}
             />
           </FadeInView>
 
-          <FadeInView delay={120} style={styles.card}>
-            <Text style={styles.h}>Satın almalar</Text>
+          <FadeInView delay={160} style={styles.card}>
+            <Text style={styles.h}>{t('settings.purchases')}</Text>
             <Text style={styles.sub}>
-              Premium: {premium ? 'aktif' : 'kapalı'} (cihaz geneli) · {MONETIZATION_COPY.parentalRequired}
+              {t('settings.purchasesSub', {
+                status: premium ? t('common.active') : t('common.inactive'),
+                note: MONETIZATION_COPY.parentalRequired,
+              })}
             </Text>
             <PrimaryButton
-              label={busy ? '…' : 'Satın almaları geri yükle'}
+              label={busy ? '…' : t('settings.restore')}
               tone="sky"
               disabled={busy}
               onPress={() => setGate({ type: 'restore' })}
@@ -262,10 +297,10 @@ export function SettingsScreen({ navigation }: Props) {
             />
           </FadeInView>
 
-          <FadeInView delay={160} style={styles.card}>
-            <Text style={styles.h}>Güvenlik & gizlilik</Text>
+          <FadeInView delay={200} style={styles.card}>
+            <Text style={styles.h}>{t('settings.safety')}</Text>
             <PrimaryButton
-              label="Gizlilik politikası"
+              label={t('settings.privacy')}
               tone="coral"
               onPress={() => navigation.navigate('Privacy')}
               style={{ marginTop: 10 }}
@@ -273,11 +308,11 @@ export function SettingsScreen({ navigation }: Props) {
             <Text style={[styles.sub, { marginTop: 12 }]}>{MONETIZATION_COPY.noTargeting}</Text>
           </FadeInView>
 
-          <FadeInView delay={200} style={styles.card}>
-            <Text style={styles.h}>Geliştirici</Text>
-            <Text style={styles.sub}>Tüm profilleri ve ilerlemeyi siler (ebeveyn onayı).</Text>
+          <FadeInView delay={240} style={styles.card}>
+            <Text style={styles.h}>{t('settings.dev')}</Text>
+            <Text style={styles.sub}>{t('settings.devSub')}</Text>
             <PrimaryButton
-              label="İlerlemeyi sıfırla"
+              label={t('settings.reset')}
               tone="coral"
               onPress={() => setGate({ type: 'reset' })}
               style={{ marginTop: 10 }}
@@ -301,24 +336,24 @@ export function SettingsScreen({ navigation }: Props) {
       >
         <View style={styles.confirmBackdrop}>
           <View style={styles.confirmCard}>
-            <Text style={styles.confirmTitle}>Profil değiştir</Text>
+            <Text style={styles.confirmTitle}>{t('settings.switchTitle')}</Text>
             <Text style={styles.confirmBody}>
               {pendingSwitch
-                ? `${pendingSwitch.name} ile oynamaya geçilsin mi?`
-                : 'Profil değiştirilsin mi?'}
+                ? t('settings.switchBody', { name: pendingSwitch.name })
+                : t('settings.switchBodyGeneric')}
             </Text>
             <View style={styles.confirmRow}>
               <Pressable
                 onPress={() => setSwitchConfirmId(null)}
                 style={({ pressed }) => [styles.confirmBtn, styles.confirmGhost, { opacity: pressed ? 0.85 : 1 }]}
               >
-                <Text style={styles.confirmGhostText}>Vazgeç</Text>
+                <Text style={styles.confirmGhostText}>{t('common.cancel')}</Text>
               </Pressable>
               <Pressable
                 onPress={confirmSwitch}
                 style={({ pressed }) => [styles.confirmBtn, styles.confirmPrimary, { opacity: pressed ? 0.85 : 1 }]}
               >
-                <Text style={styles.confirmPrimaryText}>Geç</Text>
+                <Text style={styles.confirmPrimaryText}>{t('settings.switchGo')}</Text>
               </Pressable>
             </View>
           </View>
@@ -333,18 +368,18 @@ export function SettingsScreen({ navigation }: Props) {
       >
         <View style={styles.confirmBackdrop}>
           <View style={styles.confirmCard}>
-            <Text style={styles.confirmTitle}>Profili sil</Text>
+            <Text style={styles.confirmTitle}>{t('settings.deleteTitle')}</Text>
             <Text style={styles.confirmBody}>
               {pendingDelete
-                ? `${pendingDelete.name} profilini silmek istiyor musun? İlerleme kaybolur.`
-                : 'Profil silinsin mi?'}
+                ? t('settings.deleteBody', { name: pendingDelete.name })
+                : t('settings.deleteBodyGeneric')}
             </Text>
             <View style={styles.confirmRow}>
               <Pressable
                 onPress={() => setDeleteConfirmId(null)}
                 style={({ pressed }) => [styles.confirmBtn, styles.confirmGhost, { opacity: pressed ? 0.85 : 1 }]}
               >
-                <Text style={styles.confirmGhostText}>Vazgeç</Text>
+                <Text style={styles.confirmGhostText}>{t('common.cancel')}</Text>
               </Pressable>
               <Pressable
                 onPress={() => {
@@ -355,7 +390,7 @@ export function SettingsScreen({ navigation }: Props) {
                 }}
                 style={({ pressed }) => [styles.confirmBtn, styles.confirmDanger, { opacity: pressed ? 0.85 : 1 }]}
               >
-                <Text style={styles.confirmPrimaryText}>Sil</Text>
+                <Text style={styles.confirmPrimaryText}>{t('settings.delete')}</Text>
               </Pressable>
             </View>
           </View>
@@ -392,6 +427,19 @@ const styles = StyleSheet.create({
   },
   h: { fontWeight: '900', fontSize: 18, color: colors.forestDeep },
   sub: { marginTop: 6, color: colors.muted, fontWeight: '600', lineHeight: 20 },
+  langRow: { flexDirection: 'row', gap: 10, marginTop: 14 },
+  langBtn: {
+    flex: 1,
+    minHeight: 52,
+    borderRadius: 16,
+    backgroundColor: colors.mint,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 12,
+  },
+  langBtnOn: { backgroundColor: colors.forest },
+  langText: { fontWeight: '800', fontSize: 16, color: colors.forestDeep },
+  langTextOn: { color: colors.white },
   profileList: { marginTop: 14, gap: 10 },
   profileRow: {
     flexDirection: 'row',

@@ -1,3 +1,5 @@
+import { t } from '../i18n';
+
 /**
  * Monetization mode flag.
  * Keep `true` until real AdMob / StoreKit / Play Billing SDKs are wired.
@@ -6,10 +8,21 @@
  */
 export const USE_MOCK_MONETIZATION = true;
 
+/** Localized monetization UI strings (resolve at call time). */
 export const MONETIZATION_COPY = {
-  mockBadge: 'DEMO · gerçek ödeme yok',
-  mockAdNote: 'Bu bir deneme ödüllü reklamıdır. Gerçek AdMob Kids SDK sonra bağlanır.',
-  mockIapNote: 'Bu bir deneme satın almasıdır. Gerçek StoreKit / Play Billing sonra bağlanır.',
-  noTargeting: 'Çocuklara davranışsal reklam hedeflemesi yapılmaz.',
-  parentalRequired: 'Satın alma, reklam ve yaş değişimi ebeveyn onayı ister.',
+  get mockBadge() {
+    return t('money.mockBadge');
+  },
+  get mockAdNote() {
+    return t('money.mockAdNote');
+  },
+  get mockIapNote() {
+    return t('money.mockIapNote');
+  },
+  get noTargeting() {
+    return t('money.noTargeting');
+  },
+  get parentalRequired() {
+    return t('money.parentalRequired');
+  },
 } as const;

@@ -1,3 +1,4 @@
+import { t } from '../i18n';
 import { USE_MOCK_MONETIZATION } from './config';
 
 export const REWARDED_COIN_AMOUNT = 25;
@@ -19,7 +20,7 @@ export async function showRewardedAd(): Promise<AdResult> {
     return {
       rewarded: false,
       mock: false,
-      error: 'Üretim reklam SDK henüz bağlanmadı.',
+      error: t('money.adSdkMissing'),
     };
   }
   await new Promise((r) => setTimeout(r, 900));

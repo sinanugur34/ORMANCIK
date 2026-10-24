@@ -1,5 +1,8 @@
+import { islandName } from '../i18n';
+
 export type Island = {
   id: string;
+  /** TR fallback; prefer `displayIslandName(island)`. */
   name: string;
   emoji: string;
   accent: string;
@@ -20,6 +23,11 @@ export const ISLANDS: Island[] = [
 ];
 
 export const TOTAL_LEVELS = ISLANDS.reduce((sum, i) => sum + i.levelCount, 0);
+
+export function displayIslandName(island: Island | string): string {
+  const id = typeof island === 'string' ? island : island.id;
+  return islandName(id);
+}
 
 export function islandForLevel(levelId: number): Island {
   return ISLANDS.find((i) => levelId >= i.levelStart && levelId < i.levelStart + i.levelCount) ?? ISLANDS[0];

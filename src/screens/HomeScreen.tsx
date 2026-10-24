@@ -9,6 +9,7 @@ import { CoinBadge } from '../components/CoinBadge';
 import { BouncePress, FadeInView, Pulse } from '../components/Motion';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { TOTAL_LEVELS } from '../data/islands';
+import { useT } from '../i18n';
 import { RootStackParamList } from '../navigation/types';
 import { useGame } from '../store/GameContext';
 import { colors } from '../theme/colors';
@@ -16,6 +17,7 @@ import { colors } from '../theme/colors';
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
 export function HomeScreen({ navigation }: Props) {
+  const t = useT();
   const {
     coins,
     premium,
@@ -26,6 +28,7 @@ export function HomeScreen({ navigation }: Props) {
     clearedLevelIds,
     highestUnlocked,
     voiceEnabled,
+    language,
   } = useGame();
   const soft = ageBand === '3-5';
   const greetedId = useRef<string | null>(null);
@@ -41,8 +44,10 @@ export function HomeScreen({ navigation }: Props) {
     if (!activeProfileId || !childName || !voiceEnabled) return;
     if (greetedId.current === activeProfileId) return;
     greetedId.current = activeProfileId;
-    void speakKidPrompt(`Merhaba, ${childName}!`);
-  }, [activeProfileId, childName, voiceEnabled]);
+    void speakKidPrompt(t('home.greetSpeech', { name: childName }));
+  }, [activeProfileId, childName, voiceEnabled, language, t]);
+
+  const explorer = childName ?? t('common.explorer');
 
   return (
     <AnimatedBackground variant="forest">
@@ -50,22 +55,26 @@ export function HomeScreen({ navigation }: Props) {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 48 }}>
           <View style={styles.topBar}>
             <View style={{ flex: 1, paddingRight: 8 }}>
-              <Text style={styles.brand}>Ormancık</Text>
-              <Text style={styles.hello}>Merhaba, {childName ?? 'kaşif'}!</Text>
+              <Text style={styles.brand}>{t('common.brand')}</Text>
+              <Text style={styles.hello}>{t('home.hello', { name: explorer })}</Text>
               <Text style={styles.meta}>
                 {soft
-                  ? `Yaş ${childAge}`
-                  : `Yaş ${childAge} · ${clearedLevelIds.length}/${TOTAL_LEVELS}`}
+                  ? t('home.age', { age: childAge ?? '' })
+                  : t('home.ageProgress', {
+                      age: childAge ?? '',
+                      cleared: clearedLevelIds.length,
+                      total: TOTAL_LEVELS,
+                    })}
               </Text>
             </View>
             <View style={styles.topRight}>
               <BouncePress onPress={() => navigation.navigate('Settings')} style={styles.settingsBtn}>
-                <Text style={styles.settingsText}>Ayar</Text>
+                <Text style={styles.settingsText}>{t('home.settings')}</Text>
               </BouncePress>
               <CoinBadge coins={coins} />
               {premium ? (
                 <View style={styles.premPill}>
-                  <Text style={styles.premText}>Premium</Text>
+                  <Text style={styles.premText}>{t('home.premium')}</Text>
                 </View>
               ) : null}
             </View>
@@ -76,13 +85,11 @@ export function HomeScreen({ navigation }: Props) {
               <CinematicHero height={soft ? 260 : 280} />
               <View style={styles.heroCopy}>
                 <Text style={[styles.heroTitle, soft && { fontSize: 26 }]}>
-                  {soft ? 'Hadi ormana!' : 'Orman seni bekliyor'}
+                  {soft ? t('home.heroSoft') : t('home.hero')}
                 </Text>
-                {!soft ? (
-                  <Text style={styles.heroSub}>80 bölüm · kostümler · sihirli odalar</Text>
-                ) : (
-                  <Text style={styles.heroSub}>Dokun ve oyna</Text>
-                )}
+                <Text style={styles.heroSub}>
+                  {soft ? t('home.heroSubSoft') : t('home.heroSub')}
+                </Text>
               </View>
             </View>
           </FadeInView>
@@ -90,7 +97,7 @@ export function HomeScreen({ navigation }: Props) {
           <FadeInView delay={100} style={styles.actions}>
             <Pulse>
               <PrimaryButton
-                label={soft ? 'Oyna' : 'Haritaya Git'}
+                label={soft ? t('home.play') : t('home.goMap')}
                 onPress={() =>
                   soft
                     ? navigation.navigate('Level', { levelId: nextLevel })
@@ -99,7 +106,7 @@ export function HomeScreen({ navigation }: Props) {
               />
             </Pulse>
             <PrimaryButton
-              label={soft ? 'Harita' : 'Oyun Odası'}
+              label={soft ? t('home.map') : t('home.playRoom')}
               tone="sky"
               onPress={() =>
                 soft ? navigation.navigate('Map') : navigation.navigate('PlayRoom')
@@ -108,7 +115,7 @@ export function HomeScreen({ navigation }: Props) {
             />
             {soft ? (
               <PrimaryButton
-                label="Oyun Odası"
+                label={t('home.playRoom')}
                 tone="sun"
                 large={false}
                 onPress={() => navigation.navigate('PlayRoom')}
@@ -119,30 +126,30 @@ export function HomeScreen({ navigation }: Props) {
 
           {!soft ? (
             <FadeInView delay={180}>
-              <Text style={styles.section}>Keşfet</Text>
+              <Text style={styles.section}>{t('home.explore')}</Text>
               <View style={styles.row}>
                 <BouncePress style={styles.tile} onPress={() => navigation.navigate('Shop')}>
                   <Image source={require('../../assets/art/mascot.jpg')} style={styles.tileImg} />
-                  <Text style={styles.tileTitle}>Dükkan</Text>
-                  <Text style={styles.tileSub}>Kostüm & dostlar</Text>
+                  <Text style={styles.tileTitle}>{t('home.shop')}</Text>
+                  <Text style={styles.tileSub}>{t('home.shopSub')}</Text>
                 </BouncePress>
                 <BouncePress style={styles.tile} onPress={() => navigation.navigate('Premium')}>
                   <Image source={require('../../assets/art/world-map.jpg')} style={styles.tileImg} />
-                  <Text style={styles.tileTitle}>Premium</Text>
-                  <Text style={styles.tileSub}>Reklamsız + her şey</Text>
+                  <Text style={styles.tileTitle}>{t('home.premiumTile')}</Text>
+                  <Text style={styles.tileSub}>{t('home.premiumSub')}</Text>
                 </BouncePress>
               </View>
             </FadeInView>
           ) : (
             <FadeInView delay={180} style={styles.softExplore}>
               <BouncePress style={styles.softTile} onPress={() => navigation.navigate('Shop')}>
-                <Text style={styles.softTileText}>Dükkan</Text>
+                <Text style={styles.softTileText}>{t('home.shop')}</Text>
               </BouncePress>
             </FadeInView>
           )}
 
           <BouncePress style={styles.privacyLink} onPress={() => navigation.navigate('Privacy')}>
-            <Text style={styles.privacyText}>Gizlilik politikası</Text>
+            <Text style={styles.privacyText}>{t('home.privacy')}</Text>
           </BouncePress>
         </ScrollView>
       </SafeAreaView>

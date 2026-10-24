@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 /**
- * Synthesize Turkish female neural TTS via Microsoft Edge (tr-TR-EmelNeural).
+ * Synthesize neural TTS via Microsoft Edge (tr-TR-EmelNeural / en-US-JennyNeural).
  * Used by Metro /api/tts middleware and offline verification scripts.
  *
  * Usage:
  *   node scripts/tts-synthesize.mjs "Küçük olanı seç!" [/path/out.mp3]
+ *   EDGE_VOICE=en-US-JennyNeural node scripts/tts-synthesize.mjs "Find the small one!"
  */
 import { spawn } from 'node:child_process';
 import crypto from 'node:crypto';
@@ -12,8 +13,13 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-export const EDGE_VOICE = 'tr-TR-EmelNeural';
+export const EDGE_VOICE_TR = 'tr-TR-EmelNeural';
+export const EDGE_VOICE_EN = 'en-US-JennyNeural';
+/** @deprecated use EDGE_VOICE_TR — kept for older callers */
+export const EDGE_VOICE = EDGE_VOICE_TR;
 export const EDGE_RATE = '-10%';
+
+const ALLOWED_VOICES = new Set([EDGE_VOICE_TR, EDGE_VOICE_EN]);
 
 const CACHE_DIR = path.join(os.tmpdir(), 'ormancik-tts');
 
@@ -21,17 +27,37 @@ function ensureCacheDir() {
   fs.mkdirSync(CACHE_DIR, { recursive: true });
 }
 
-export function cacheKey(text) {
+/**
+ * @param {string} [voice]
+ * @returns {string}
+ */
+export function resolveVoice(voice) {
+  const v = String(voice || process.env.EDGE_VOICE || EDGE_VOICE_TR).trim();
+  if (ALLOWED_VOICES.has(v)) return v;
+  if (v.toLowerCase().startsWith('en')) return EDGE_VOICE_EN;
+  return EDGE_VOICE_TR;
+}
+
+/**
+ * @param {string} text
+ * @param {string} [voice]
+ */
+export function cacheKey(text, voice = EDGE_VOICE_TR) {
+  const v = resolveVoice(voice);
   return crypto
     .createHash('sha256')
-    .update(`${EDGE_VOICE}|${EDGE_RATE}|${text}`)
+    .update(`${v}|${EDGE_RATE}|${text}`)
     .digest('hex')
     .slice(0, 32);
 }
 
-export function cachePathFor(text) {
+/**
+ * @param {string} text
+ * @param {string} [voice]
+ */
+export function cachePathFor(text, voice = EDGE_VOICE_TR) {
   ensureCacheDir();
-  return path.join(CACHE_DIR, `${cacheKey(text)}.mp3`);
+  return path.join(CACHE_DIR, `${cacheKey(text, voice)}.mp3`);
 }
 
 function edgeTtsBin() {
@@ -43,14 +69,15 @@ function edgeTtsBin() {
 
 /**
  * @param {string} text
- * @param {{ force?: boolean }} [opts]
+ * @param {{ force?: boolean, voice?: string }} [opts]
  * @returns {Promise<string>} absolute path to mp3
  */
 export async function synthesizeToFile(text, opts = {}) {
   const trimmed = String(text ?? '').trim();
   if (!trimmed) throw new Error('empty text');
 
-  const out = cachePathFor(trimmed);
+  const voice = resolveVoice(opts.voice);
+  const out = cachePathFor(trimmed, voice);
   if (!opts.force && fs.existsSync(out) && fs.statSync(out).size > 0) {
     return out;
   }
@@ -60,7 +87,7 @@ export async function synthesizeToFile(text, opts = {}) {
     const bin = edgeTtsBin();
     const child = spawn(
       bin,
-      ['--voice', EDGE_VOICE, `--rate=${EDGE_RATE}`, '--text', trimmed, '--write-media', tmp],
+      ['--voice', voice, `--rate=${EDGE_RATE}`, '--text', trimmed, '--write-media', tmp],
       {
         env: {
           ...process.env,
@@ -103,7 +130,7 @@ if (isMain) {
     console.error('Usage: node scripts/tts-synthesize.mjs "<text>" [outfile.mp3]');
     process.exit(1);
   }
-  synthesizeToFile(text)
+  synthesizeToFile(text, { voice: process.env.EDGE_VOICE })
     .then((file) => {
       if (dest) {
         fs.copyFileSync(file, dest);

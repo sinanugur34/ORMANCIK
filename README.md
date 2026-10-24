@@ -14,6 +14,7 @@ Play Store ve App Store’a gidecek şekilde tasarlandı: ebeveyn kapısı, yaş
 - **Premium (tek seferlik):** Reklamsız + tüm kozmetik + bonus jeton
 - **Gizlilik / ayarlar:** Uygulama içi gizlilik politikası; yaş değişimi ebeveyn kapılı
 - **Premium görseller:** Key art, Ken Burns hero, sinematik intro, oda arka planları, Reanimated geçişler
+- **i18n (TR + EN):** Birincil dil Türkçe; ikinci dil İngilizce. Ayarlar → Dil / Language (cihaz geneli, AsyncStorage). Katalog: `src/i18n/` (`t(key)`, Edge TTS `tr-TR-EmelNeural` / `en-US-JennyNeural`)
 
 ## Çalıştırma
 
