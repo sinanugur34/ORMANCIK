@@ -31,8 +31,8 @@ Replace privacy URL / support email before public release. Mock monetization (`U
 - Adaptive foreground / background are **512×512** (Expo accepts; optional upgrade to **1024×1024** for sharper launcher icons)
 - Monochrome **432×432** (OK for Android 13+ themed icon)
 - Splash / app icon **1024×1024** present
-- Feature graphic `assets/store/play-feature-1024x500.png` + icon `play-icon-512.png` present
-- Phone screenshots (TR, 1080×1920): `assets/store/screenshots/phone-01.png` … `phone-04.png` (home, map, level, play room). Optional: EN locale shots + tablet
+- Locale listing graphics under `assets/store/tr/` and `assets/store/en/` (icon, feature, 4× phone). Tablet optional — phone set enough for draft
+- Shared masters still at `assets/store/play-icon-512.png` + `play-feature-1024x500.png` (prefer locale feature files for upload)
 - No `extra.eas.projectId` yet — created by `eas init` after login
 
 ### AAB build & output expectations
@@ -147,9 +147,29 @@ Gizlilik: https://ormancik.app/privacy
 Destek: privacy@ormancik.app
 ```
 
-- [x] Graphics: icon (512), feature graphic 1024×500, phone screenshots (≥2 TR) — upload from `assets/store/`
+- [x] Graphics: TR + EN icon / feature / phone shots — see upload map below
 - [ ] Category: Education and/or Casual; tags as appropriate
 - [ ] Contact email + privacy URL
+
+### Play Console graphics upload map
+
+Package stays **`com.ormancik.kids`**. App icon is creature-only (same art both locales). Feature graphic and phone screenshots **differ by language**.
+
+| Play Console slot | Turkish listing (**Ormancık**) | English listing (**Woodlet**) |
+|-------------------|-------------------------------|-------------------------------|
+| High-res icon 512×512 | `assets/store/tr/icon-512.png` | `assets/store/en/icon-512.png` |
+| Feature graphic 1024×500 | `assets/store/tr/feature-1024x500.png` | `assets/store/en/feature-1024x500.png` |
+| Phone 1 — home | `assets/store/tr/phone-01.png` | `assets/store/en/phone-01.png` |
+| Phone 2 — map | `assets/store/tr/phone-02.png` | `assets/store/en/phone-02.png` |
+| Phone 3 — level | `assets/store/tr/phone-03.png` | `assets/store/en/phone-03.png` |
+| Phone 4 — play room | `assets/store/tr/phone-04.png` | `assets/store/en/phone-04.png` |
+| 7″ tablet | *skipped for draft* | *skipped for draft* |
+
+Artifact mirrors: `/opt/cursor/artifacts/store-tr/` and `store-en/`.
+
+```bash
+npm run store:screenshots -- both   # regenerates phone-01…04 for tr + en
+```
 
 ### 7. Privacy URL
 
@@ -215,14 +235,14 @@ Destek: privacy@ormancik.app
 
 ## Screenshots guidance (Play)
 
-Phone: 1080×1920 or similar. Prefer Turkish UI; add EN locale screenshots when EN listing is live.
+Phone: **1080×1920** — shipped for both locales under `assets/store/{tr,en}/phone-0N.png`.
 
-1. Home + brand (**Ormancık** TR / **Woodlet** EN) + hero art  
+1. Home + brand (**Ormancık** / **Woodlet**) + hero art  
 2. World map islands  
 3. In-level play  
 4. Play room / costume  
-5. Shop with parental gate visible  
-6. Privacy / settings  
+5. (Later) Shop with parental gate · Privacy / settings  
+6. Tablet 7" optional later — not required for draft listing  
 
 ---
 

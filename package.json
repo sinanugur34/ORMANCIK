@@ -20,7 +20,9 @@
     "eas:submit:android": "npx eas-cli@latest submit --platform android --profile production",
     "eas:submit:ios": "npx eas-cli@latest submit --platform ios --profile production",
     "play:build": "npm run eas:build:android",
-    "play:submit": "npm run eas:submit:android"
+    "play:submit": "npm run eas:submit:android",
+    "store:screenshots": "node scripts/capture-store-screenshots.mjs",
+    "store:listing-phones": "node scripts/capture-listing-phones.mjs"
   },
   "dependencies": {
     "@expo/metro-runtime": "~58.0.15",
@@ -48,6 +50,7 @@
   "devDependencies": {
     "@types/react": "~19.3.0",
     "babel-preset-expo": "^58.0.20",
+    "playwright": "^1.64.1",
     "typescript": "~6.0.3"
   },
   "private": true
