@@ -31,7 +31,7 @@ Replace privacy URL / support email before public release. Mock monetization (`U
 - Adaptive foreground / background are **512×512** (Expo accepts; optional upgrade to **1024×1024** for sharper launcher icons)
 - Monochrome **432×432** (OK for Android 13+ themed icon)
 - Splash / app icon **1024×1024** present
-- Locale listing graphics under `assets/store/tr/` and `assets/store/en/` (icon, feature, 4× phone). Tablet optional — phone set enough for draft
+- Locale listing graphics under `assets/store/tr/` and `assets/store/en/` (icon, feature, **8× phone**, **4× 7″ tablet**, **4× 10″ tablet**)
 - Shared masters still at `assets/store/play-icon-512.png` + `play-feature-1024x500.png` (prefer locale feature files for upload)
 - No `extra.eas.projectId` yet — created by `eas init` after login
 
@@ -159,16 +159,28 @@ Package stays **`com.ormancik.kids`**. App icon is creature-only (same art both 
 |-------------------|-------------------------------|-------------------------------|
 | High-res icon 512×512 | `assets/store/tr/icon-512.png` | `assets/store/en/icon-512.png` |
 | Feature graphic 1024×500 | `assets/store/tr/feature-1024x500.png` | `assets/store/en/feature-1024x500.png` |
-| Phone 1 — home | `assets/store/tr/phone-01.png` | `assets/store/en/phone-01.png` |
-| Phone 2 — map | `assets/store/tr/phone-02.png` | `assets/store/en/phone-02.png` |
-| Phone 3 — level | `assets/store/tr/phone-03.png` | `assets/store/en/phone-03.png` |
-| Phone 4 — play room | `assets/store/tr/phone-04.png` | `assets/store/en/phone-04.png` |
-| 7″ tablet | *skipped for draft* | *skipped for draft* |
+| Phone 1 — cinematic | `assets/store/tr/phone-01.png` | `assets/store/en/phone-01.png` |
+| Phone 2 — profile / age | `assets/store/tr/phone-02.png` | `assets/store/en/phone-02.png` |
+| Phone 3 — world map | `assets/store/tr/phone-03.png` | `assets/store/en/phone-03.png` |
+| Phone 4 — animalMatch | `assets/store/tr/phone-04.png` | `assets/store/en/phone-04.png` |
+| Phone 5 — pathOrder | `assets/store/tr/phone-05.png` | `assets/store/en/phone-05.png` |
+| Phone 6 — win / Bravo | `assets/store/tr/phone-06.png` | `assets/store/en/phone-06.png` |
+| Phone 7 — play room | `assets/store/tr/phone-07.png` | `assets/store/en/phone-07.png` |
+| Phone 8 — Premium | `assets/store/tr/phone-08.png` | `assets/store/en/phone-08.png` |
+| 7″ tablet 1 — home | `assets/store/tr/tablet7-01.png` | `assets/store/en/tablet7-01.png` |
+| 7″ tablet 2 — map | `assets/store/tr/tablet7-02.png` | `assets/store/en/tablet7-02.png` |
+| 7″ tablet 3 — play room | `assets/store/tr/tablet7-03.png` | `assets/store/en/tablet7-03.png` |
+| 7″ tablet 4 — Premium | `assets/store/tr/tablet7-04.png` | `assets/store/en/tablet7-04.png` |
+| 10″ tablet 1–4 | `assets/store/tr/tablet10-0N.png` | `assets/store/en/tablet10-0N.png` |
+
+Phone: **1080×1920**. Tablet7: **1920×1200** landscape. Tablet10: **2560×1600** (scaled from tablet7).
 
 Artifact mirrors: `/opt/cursor/artifacts/store-tr/` and `store-en/`.
 
 ```bash
-npm run store:screenshots -- both   # regenerates phone-01…04 for tr + en
+npm run store:screenshots -- both        # 8 phones + tablets, tr + en
+npm run store:screenshots -- tr phones   # phones only
+npm run store:listing-phones -- both     # draft 4-phone subset (home/map/level/room)
 ```
 
 ### 7. Privacy URL
@@ -235,13 +247,18 @@ npm run store:screenshots -- both   # regenerates phone-01…04 for tr + en
 
 ## Screenshots guidance (Play)
 
-Phone: **1080×1920** — shipped for both locales under `assets/store/{tr,en}/phone-0N.png`.
+Phone: **1080×1920** — 8 shots per locale under `assets/store/{tr,en}/phone-0N.png`.  
+Tablet: **1920×1200** (7″) and **2560×1600** (10″) — 4 each per locale.
 
-1. Home + brand (**Ormancık** / **Woodlet**) + hero art  
-2. World map islands  
-3. In-level play  
-4. Play room / costume  
-5. (Later) Shop with parental gate · Privacy / settings  
+1. Cinematic intro (brand hero)  
+2. Profile / age warm UI  
+3. World map islands  
+4. animalMatch level (boosted playfield)  
+5. pathOrder level  
+6. Win / Bravo celebration  
+7. Play room with art background  
+8. Premium  
+
 6. Tablet 7" optional later — not required for draft listing  
 
 ---

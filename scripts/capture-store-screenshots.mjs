@@ -150,19 +150,19 @@ async function tapText(page, text, { exact = true } = {}) {
 
 async function hideDemoBanners(page) {
   await page.evaluate(() => {
-    const walk = (root) => {
-      for (const el of root.querySelectorAll('*')) {
-        const t = (el.textContent || '').trim();
-        if (t.startsWith('DEMO') || t.includes('DEMO ·')) {
-          let n = el;
-          for (let i = 0; i < 4 && n.parentElement; i++) {
-            if ((n.textContent || '').length < 80) n = n.parentElement;
-          }
-          n.style.setProperty('display', 'none', 'important');
-        }
+    for (const el of document.querySelectorAll('*')) {
+      // Only leaf-ish nodes whose own text is the DEMO badge (avoid nuking whole screens).
+      if (el.children.length > 2) continue;
+      const t = (el.textContent || '').trim();
+      if (!(t.startsWith('DEMO') || t.includes('DEMO ·'))) continue;
+      if (t.length > 64) continue;
+      let n = el;
+      // Climb at most one wrapper if it is still badge-sized.
+      if (n.parentElement && (n.parentElement.textContent || '').trim().length <= 64) {
+        n = n.parentElement;
       }
-    };
-    walk(document);
+      n.style.setProperty('display', 'none', 'important');
+    }
   });
 }
 
@@ -196,7 +196,10 @@ if std < 12 and dark < 0.002 and sat < 0.02:
   console.log('qa', label, stdout.trim());
 }
 
-/** Crop sparse level UI (content sits in the top band) and scale to fill phone width. */
+/**
+ * Level play UI sits in the top ~480–560px with a huge empty card below.
+ * Crop a fixed playfield band and cover-scale into 9:16 so store shots aren't tiny.
+ */
 async function boostLevelFrame(filePath) {
   await execFileAsync('python3', [
     '-c',
@@ -207,34 +210,35 @@ p=sys.argv[1]
 im=Image.open(p).convert('RGB')
 a=np.asarray(im)
 h,w=a.shape[:2]
-# Row is "empty" if almost all pixels are near paper-white.
-empty=np.mean((a[:,:,0]>245)&(a[:,:,1]>245)&(a[:,:,2]>242), axis=1)
-cut=int(h*0.78)
-active=np.where(empty[:cut] < 0.90)[0]
-if len(active)==0:
-    raise SystemExit('no content to boost')
-y1=0
-y2=min(h, int(active[-1] + max(24, h*0.03)))
-# Keep enough vertical context (header + playfield).
-min_h=int(h*0.48)
-if y2-y1 < min_h:
-    y2=min(h, y1+min_h)
-crop=im.crop((0,y1,w,y2))
+# Fixed band: header + prompt + target + options (measured on animalMatch/pathOrder).
+y2=min(h, max(520, int(h*0.28)))
+# Nudge down if option buttons (saturated chips) sit a bit lower.
+cx0,cx1=int(w*0.15), int(w*0.85)
+sat=((np.max(a[:,cx0:cx1],axis=2).astype(int)-np.min(a[:,cx0:cx1],axis=2).astype(int))>50).mean(axis=1)
+dark=((a[:,cx0:cx1,0]<90)&(a[:,cx0:cx1,1]<120)&(a[:,cx0:cx1,2]<100)).mean(axis=1)
+sig=np.where((sat>0.04)|(dark>0.01))[0]
+sig=sig[(sig>80)&(sig<int(h*0.45))]
+if len(sig):
+    y2=max(y2, int(sig[-1] + 36))
+y2=min(y2, int(h*0.36))
+crop=im.crop((0,0,w,y2))
+# Fit WIDTH (preserve left/right chrome), letterbox vertically onto peach sampled from header.
 tw,th=w,h
-cw,ch=crop.size
-# Fit WIDTH so we never chop left/right chrome; pad or crop height.
-scale=tw/cw
-nw,nh=tw, int(ch*scale)
+scale=tw/crop.size[0]
+nw,nh=tw, int(crop.size[1]*scale + 0.5)
+# If still short of frame height, scale up further (cover height) but keep centered.
+if nh < th:
+    scale=th/crop.size[1]
+    nw,nh=int(crop.size[0]*scale+0.5), th
 resized=crop.resize((nw,nh), Image.Resampling.LANCZOS)
-cream=tuple(int(x) for x in a[min(h-1, y2-1), w//2])
-canvas=Image.new('RGB', (tw, th), cream)
-if nh >= th:
-    # Prefer keeping the top (header + prompt)
-    canvas.paste(resized.crop((0,0,tw,th)), (0,0))
-else:
-    canvas.paste(resized, (0,0))
-canvas.save(p, 'PNG', optimize=True)
-print(f'boosted crop=0..{y2} fitW -> {tw}x{th} (scaledH={nh})')
+x=max(0,(nw-tw)//2)
+out=resized.crop((x,0,x+tw,th))
+# Reject empty boosts (only peach bar).
+oa=np.asarray(out)
+if oa.std()<20:
+    raise SystemExit(f'boost produced empty frame std={oa.std():.1f}')
+out.save(p, 'PNG', optimize=True)
+print(f'boosted crop=0..{y2} -> {tw}x{th} scale={scale:.2f} std={oa.std():.1f}')
 `,
     filePath,
   ]);
@@ -435,16 +439,15 @@ async function outsFor(locale) {
   return { tag: locale, dirs };
 }
 
-async function capturePhoneLocale(browser, locale) {
+async function capturePhoneLocale(locale) {
   const outs = await outsFor(locale);
   const L = LOCALES[locale];
   const vp = PHONE;
 
-  // Play Console order (best-looking UI moments):
+  // Play Console order:
   // 01 cinematic · 02 profile · 03 map · 04 animalMatch · 05 pathOrder · 06 win · 07 play room · 08 premium
 
-  // —— 01 Cinematic / home hero ——
-  {
+  await withScene(`${locale}/phone-01`, async (browser) => {
     const { context, page } = await openApp(browser, {
       locale,
       state: stateFresh(L),
@@ -455,10 +458,9 @@ async function capturePhoneLocale(browser, locale) {
     await waitForText(page, L.introLine, { exact: false, timeout: 8000 }).catch(() => {});
     await shot(page, outs, 'phone-01', vp);
     await context.close();
-  }
+  });
 
-  // —— 02 Age / profile warm UI ——
-  {
+  await withScene(`${locale}/phone-02`, async (browser) => {
     const { context, page } = await openApp(browser, {
       locale,
       state: stateFresh(L),
@@ -480,10 +482,9 @@ async function capturePhoneLocale(browser, locale) {
     await page.waitForTimeout(500);
     await shot(page, outs, 'phone-02', vp);
     await context.close();
-  }
+  });
 
-  // —— 03 World map (colorful islands) ——
-  {
+  await withScene(`${locale}/phone-03`, async (browser) => {
     const { context, page } = await openApp(browser, {
       locale,
       state: stateHome(L, { age: 7 }),
@@ -495,10 +496,9 @@ async function capturePhoneLocale(browser, locale) {
     await page.waitForTimeout(400);
     await shot(page, outs, 'phone-03', vp);
     await context.close();
-  }
+  });
 
-  // —— 04 animalMatch (age 5 → level 1) ——
-  {
+  await withScene(`${locale}/phone-04`, async (browser) => {
     const { context, page } = await openApp(browser, {
       locale,
       state: stateHome(L, {
@@ -512,13 +512,11 @@ async function capturePhoneLocale(browser, locale) {
     await waitHome(page, L);
     await tapText(page, L.homePlay);
     await waitLevelPrompt(page, L.animalPrompt);
-    await densifyLevelDom(page);
     await shot(page, outs, 'phone-04', vp, { boostLevel: true });
     await context.close();
-  }
+  });
 
-  // —— 05 pathOrder (age 7 → level 2) ——
-  {
+  await withScene(`${locale}/phone-05`, async (browser) => {
     const { context, page } = await openApp(browser, {
       locale,
       state: stateHome(L, { age: 7 }),
@@ -528,13 +526,11 @@ async function capturePhoneLocale(browser, locale) {
     await goMap(page, L);
     await openLevelFromMap(page, 2);
     await waitLevelPrompt(page, L.pathPrompt);
-    await densifyLevelDom(page);
     await shot(page, outs, 'phone-05', vp, { boostLevel: true });
     await context.close();
-  }
+  });
 
-  // —— 06 Win / celebration ——
-  {
+  await withScene(`${locale}/phone-06`, async (browser) => {
     const { context, page } = await openApp(browser, {
       locale,
       state: stateHome(L, {
@@ -551,10 +547,9 @@ async function capturePhoneLocale(browser, locale) {
     await page.waitForTimeout(900);
     await shot(page, outs, 'phone-06', vp);
     await context.close();
-  }
+  });
 
-  // —— 07 Play room (art background) ——
-  {
+  await withScene(`${locale}/phone-07`, async (browser) => {
     const { context, page } = await openApp(browser, {
       locale,
       state: stateHome(L, { age: 7, room: 'room-undersea' }),
@@ -573,35 +568,32 @@ async function capturePhoneLocale(browser, locale) {
     await page.waitForTimeout(700);
     await shot(page, outs, 'phone-07', vp);
     await context.close();
-  }
+  });
 
-  // —— 08 Premium ——
-  {
+  await withScene(`${locale}/phone-08`, async (browser) => {
     const { context, page } = await openApp(browser, {
       locale,
       state: stateHome(L, { age: 7, premium: true }),
       viewport: vp,
     });
     await waitHome(page, L);
-    // Tile subtitle is unique — home also shows a non-pressable Premium pill.
     await tapText(page, L.premiumTileSub);
     await waitForText(page, L.premiumOwned, { exact: false, timeout: 15000 });
     await page.waitForTimeout(500);
     await hideDemoBanners(page);
     await shot(page, outs, 'phone-08', vp);
     await context.close();
-  }
+  });
 
   console.log('phone done', locale);
 }
 
-async function captureTabletLocale(browser, locale) {
+async function captureTabletLocale(locale) {
   const outs = await outsFor(locale);
   const L = LOCALES[locale];
   const vp = TABLET7;
 
-  // 01 Home hero (wide)
-  {
+  await withScene(`${locale}/tablet7-01`, async (browser) => {
     const { context, page } = await openApp(browser, {
       locale,
       state: stateHome(L, { age: 7 }),
@@ -610,10 +602,9 @@ async function captureTabletLocale(browser, locale) {
     await waitHome(page, L);
     await shot(page, outs, 'tablet7-01', vp);
     await context.close();
-  }
+  });
 
-  // 02 World map
-  {
+  await withScene(`${locale}/tablet7-02`, async (browser) => {
     const { context, page } = await openApp(browser, {
       locale,
       state: stateHome(L, { age: 7 }),
@@ -623,10 +614,9 @@ async function captureTabletLocale(browser, locale) {
     await goMap(page, L);
     await shot(page, outs, 'tablet7-02', vp);
     await context.close();
-  }
+  });
 
-  // 03 Play room
-  {
+  await withScene(`${locale}/tablet7-03`, async (browser) => {
     const { context, page } = await openApp(browser, {
       locale,
       state: stateHome(L, { age: 7, room: 'room-night' }),
@@ -638,10 +628,9 @@ async function captureTabletLocale(browser, locale) {
     await page.waitForTimeout(600);
     await shot(page, outs, 'tablet7-03', vp);
     await context.close();
-  }
+  });
 
-  // 04 Premium
-  {
+  await withScene(`${locale}/tablet7-04`, async (browser) => {
     const { context, page } = await openApp(browser, {
       locale,
       state: stateHome(L, { age: 7, premium: true }),
@@ -653,9 +642,8 @@ async function captureTabletLocale(browser, locale) {
     await hideDemoBanners(page);
     await shot(page, outs, 'tablet7-04', vp);
     await context.close();
-  }
+  });
 
-  // Scale tablet7 → tablet10
   for (let i = 1; i <= 4; i++) {
     const srcName = `tablet7-0${i}.png`;
     const dstName = `tablet10-0${i}.png`;
@@ -685,32 +673,21 @@ out.save(sys.argv[2], 'PNG', optimize=True)
 }
 
 async function main() {
-  // Sanity: app up
   const res = await fetch(BASE).catch(() => null);
   if (!res || !res.ok) {
     throw new Error(`App not reachable at ${BASE} — start with: npm run web`);
   }
 
-  // argv: [locale=both|tr|en] [mode=all|phones|tablets]
   const arg = (process.argv[2] || 'both').toLowerCase();
   const mode = (process.argv[3] || 'all').toLowerCase();
   const list = arg === 'both' || arg === 'all' ? ['tr', 'en'] : [arg];
   const doPhones = mode === 'all' || mode === 'phones' || mode === 'phone';
   const doTablets = mode === 'all' || mode === 'tablets' || mode === 'tablet';
 
-  const browser = await chromium.launch({
-    headless: true,
-    args: ['--font-render-hinting=none', '--disable-lcd-text'],
-  });
-
-  try {
-    for (const locale of list) {
-      if (!LOCALES[locale]) throw new Error(`Unknown locale: ${locale}`);
-      if (doPhones) await capturePhoneLocale(browser, locale);
-      if (doTablets) await captureTabletLocale(browser, locale);
-    }
-  } finally {
-    await browser.close();
+  for (const locale of list) {
+    if (!LOCALES[locale]) throw new Error(`Unknown locale: ${locale}`);
+    if (doPhones) await capturePhoneLocale(locale);
+    if (doTablets) await captureTabletLocale(locale);
   }
   console.log('all done');
 }
