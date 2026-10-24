@@ -2,12 +2,21 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useMemo, useState } from 'react';
 import { Modal, StyleSheet, Text, View } from 'react-native';
-import Animated, { ZoomIn } from 'react-native-reanimated';
+import Animated, {
+  FadeIn,
+  ZoomIn,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimatedBackground } from '../components/AnimatedBackground';
 import { LevelPlay } from '../components/LevelPlay';
 import { BouncePress, FadeInView } from '../components/Motion';
 import { PrimaryButton } from '../components/PrimaryButton';
+import { SparkleBurst } from '../components/SparkleBurst';
 import { islandForLevel } from '../data/islands';
 import { buildLevel } from '../data/levels';
 import { RootStackParamList } from '../navigation/types';
@@ -16,6 +25,22 @@ import { colors } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Level'>;
 
+function StarRow({ stars }: { stars: 1 | 2 | 3 }) {
+  return (
+    <View style={styles.starRow}>
+      {[1, 2, 3].map((i) => (
+        <Animated.View
+          key={i}
+          entering={ZoomIn.delay(120 * i).springify()}
+          style={[styles.star, i <= stars ? styles.starOn : styles.starOff]}
+        >
+          <Text style={styles.starGlyph}>★</Text>
+        </Animated.View>
+      ))}
+    </View>
+  );
+}
+
 export function LevelScreen({ navigation, route }: Props) {
   const { levelId } = route.params;
   const { ageBand, clearLevel, isLevelUnlocked } = useGame();
@@ -23,6 +48,19 @@ export function LevelScreen({ navigation, route }: Props) {
   const level = useMemo(() => buildLevel(levelId, band), [levelId, band]);
   const island = islandForLevel(levelId);
   const [won, setWon] = useState(false);
+  const [stars, setStars] = useState<1 | 2 | 3>(3);
+  const pulse = useSharedValue(1);
+
+  React.useEffect(() => {
+    if (!won) return;
+    pulse.value = withRepeat(
+      withSequence(withTiming(1.04, { duration: 700 }), withTiming(1, { duration: 700 })),
+      -1,
+      true,
+    );
+  }, [won, pulse]);
+
+  const devamStyle = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }));
 
   if (!isLevelUnlocked(levelId)) {
     return (
@@ -40,7 +78,7 @@ export function LevelScreen({ navigation, route }: Props) {
       <SafeAreaView style={{ flex: 1 }}>
         <View style={styles.header}>
           <BouncePress onPress={() => navigation.goBack()} style={styles.back}>
-            <Text style={styles.backText}>←</Text>
+            <Text style={styles.backText}>← Geri</Text>
           </BouncePress>
           <View style={{ flex: 1 }}>
             <Text style={styles.island}>
@@ -54,8 +92,9 @@ export function LevelScreen({ navigation, route }: Props) {
           <LevelPlay
             level={level}
             band={band}
-            onWin={() => {
+            onWin={(earned) => {
               clearLevel(levelId, level.reward);
+              setStars(earned);
               setWon(true);
             }}
           />
@@ -66,30 +105,35 @@ export function LevelScreen({ navigation, route }: Props) {
         <View style={styles.modalBg}>
           <Animated.View entering={ZoomIn.springify()} style={styles.modalCard}>
             <LinearGradient colors={[island.accent, colors.forest]} style={styles.modalHero}>
-              <Text style={styles.modalEmoji}>🎉</Text>
-              <Text style={styles.modalTitle}>Bölüm bitti!</Text>
-              <Text style={styles.modalSub}>+{level.reward} jeton</Text>
+              <SparkleBurst active={won} tone="good" count={16} />
+              <Animated.Text entering={FadeIn.delay(80)} style={styles.modalTitle}>
+                Bravo!
+              </Animated.Text>
+              <Text style={styles.modalSub}>{island.name} · +{level.reward} jeton</Text>
+              <StarRow stars={stars} />
             </LinearGradient>
             <View style={styles.modalActions}>
+              {levelId < 80 ? (
+                <Animated.View style={devamStyle}>
+                  <PrimaryButton
+                    label="Devam"
+                    tone="sun"
+                    onPress={() => {
+                      setWon(false);
+                      navigation.replace('Level', { levelId: levelId + 1 });
+                    }}
+                  />
+                </Animated.View>
+              ) : null}
               <PrimaryButton
                 label="Harita"
+                large={false}
+                style={{ marginTop: 12 }}
                 onPress={() => {
                   setWon(false);
                   navigation.navigate('Map');
                 }}
               />
-              {levelId < 80 ? (
-                <PrimaryButton
-                  label="Sonraki"
-                  tone="sun"
-                  style={{ marginTop: 10 }}
-                  onPress={() => {
-                    setWon(false);
-                    // clearLevel already unlocked levelId+1
-                    navigation.replace('Level', { levelId: levelId + 1 });
-                  }}
-                />
-              ) : null}
             </View>
           </Animated.View>
         </View>
@@ -109,14 +153,15 @@ const styles = StyleSheet.create({
     paddingTop: 8,
   },
   back: {
-    width: 44,
-    height: 44,
-    borderRadius: 16,
+    minWidth: 64,
+    height: 56,
+    paddingHorizontal: 14,
+    borderRadius: 18,
     backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backText: { fontSize: 20, fontWeight: '800', color: colors.forestDeep },
+  backText: { fontSize: 16, fontWeight: '800', color: colors.forestDeep },
   island: { fontWeight: '700', color: colors.muted },
   title: { fontSize: 20, fontWeight: '900', color: colors.forestDeep },
   card: {
@@ -135,14 +180,30 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: '100%',
-    maxWidth: 360,
+    maxWidth: 380,
     borderRadius: 28,
     overflow: 'hidden',
     backgroundColor: colors.cream,
   },
-  modalHero: { padding: 28, alignItems: 'center' },
-  modalEmoji: { fontSize: 48 },
-  modalTitle: { marginTop: 8, fontSize: 28, fontWeight: '900', color: colors.white },
-  modalSub: { marginTop: 4, color: 'rgba(255,255,255,0.9)', fontWeight: '700', fontSize: 16 },
+  modalHero: {
+    padding: 32,
+    alignItems: 'center',
+    minHeight: 200,
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  modalTitle: { marginTop: 4, fontSize: 34, fontWeight: '900', color: colors.white },
+  modalSub: { marginTop: 6, color: 'rgba(255,255,255,0.92)', fontWeight: '700', fontSize: 16 },
+  starRow: { flexDirection: 'row', gap: 10, marginTop: 18 },
+  star: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  starOn: { backgroundColor: colors.sun },
+  starOff: { backgroundColor: 'rgba(255,255,255,0.25)' },
+  starGlyph: { fontSize: 22, color: colors.forestDeep, fontWeight: '900' },
   modalActions: { padding: 20 },
 });

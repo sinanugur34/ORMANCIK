@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimatedBackground } from '../components/AnimatedBackground';
 import { CinematicHero } from '../components/CinematicHero';
 import { CoinBadge } from '../components/CoinBadge';
-import { BouncePress, FadeInView } from '../components/Motion';
+import { BouncePress, FadeInView, Pulse } from '../components/Motion';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { TOTAL_LEVELS } from '../data/islands';
 import { RootStackParamList } from '../navigation/types';
@@ -15,22 +15,29 @@ import { colors } from '../theme/colors';
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
 export function HomeScreen({ navigation }: Props) {
-  const { coins, premium, ageBand, childAge, clearedLevelIds } = useGame();
+  const { coins, premium, ageBand, childAge, clearedLevelIds, highestUnlocked } = useGame();
+  const soft = ageBand === '3-5';
+  const nextLevel = (() => {
+    for (let i = 1; i <= Math.min(highestUnlocked, TOTAL_LEVELS); i++) {
+      if (!clearedLevelIds.includes(i)) return i;
+    }
+    return Math.min(Math.max(highestUnlocked, 1), TOTAL_LEVELS);
+  })();
 
   return (
     <AnimatedBackground variant="forest">
       <SafeAreaView style={styles.safe} edges={['top']}>
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 48 }}>
           <View style={styles.topBar}>
             <View>
               <Text style={styles.brand}>Tiny Grove</Text>
               <Text style={styles.meta}>
-                Yaş {childAge} · {ageBand} · {clearedLevelIds.length}/{TOTAL_LEVELS}
+                {soft ? `Yaş ${childAge}` : `Yaş ${childAge} · ${clearedLevelIds.length}/${TOTAL_LEVELS}`}
               </Text>
             </View>
             <View style={styles.topRight}>
               <BouncePress onPress={() => navigation.navigate('Settings')} style={styles.settingsBtn}>
-                <Text style={styles.settingsText}>⚙</Text>
+                <Text style={styles.settingsText}>Ayar</Text>
               </BouncePress>
               <CoinBadge coins={coins} />
               {premium ? (
@@ -43,45 +50,77 @@ export function HomeScreen({ navigation }: Props) {
 
           <FadeInView>
             <View style={styles.heroCard}>
-              <CinematicHero height={280} />
+              <CinematicHero height={soft ? 260 : 280} />
               <View style={styles.heroCopy}>
-                <Text style={styles.heroTitle}>Orman seni bekliyor</Text>
-                <Text style={styles.heroSub}>80 bölüm · kostümler · sihirli odalar</Text>
+                <Text style={[styles.heroTitle, soft && { fontSize: 26 }]}>
+                  {soft ? 'Hadi ormana!' : 'Orman seni bekliyor'}
+                </Text>
+                {!soft ? (
+                  <Text style={styles.heroSub}>80 bölüm · kostümler · sihirli odalar</Text>
+                ) : (
+                  <Text style={styles.heroSub}>Dokun ve oyna</Text>
+                )}
               </View>
             </View>
           </FadeInView>
 
           <FadeInView delay={100} style={styles.actions}>
-            <PrimaryButton label="Haritaya Git" onPress={() => navigation.navigate('Map')} />
+            <Pulse>
+              <PrimaryButton
+                label={soft ? 'Oyna' : 'Haritaya Git'}
+                onPress={() =>
+                  soft
+                    ? navigation.navigate('Level', { levelId: nextLevel })
+                    : navigation.navigate('Map')
+                }
+              />
+            </Pulse>
             <PrimaryButton
-              label="Oyun Odası"
+              label={soft ? 'Harita' : 'Oyun Odası'}
               tone="sky"
-              onPress={() => navigation.navigate('PlayRoom')}
-              style={{ marginTop: 12 }}
+              onPress={() =>
+                soft ? navigation.navigate('Map') : navigation.navigate('PlayRoom')
+              }
+              style={{ marginTop: 14 }}
             />
+            {soft ? (
+              <PrimaryButton
+                label="Oyun Odası"
+                tone="sun"
+                large={false}
+                onPress={() => navigation.navigate('PlayRoom')}
+                style={{ marginTop: 12 }}
+              />
+            ) : null}
           </FadeInView>
 
-          <FadeInView delay={180}>
-            <Text style={styles.section}>Keşfet</Text>
-            <View style={styles.row}>
-              <BouncePress style={styles.tile} onPress={() => navigation.navigate('Shop')}>
-                <Image source={require('../../assets/art/mascot.jpg')} style={styles.tileImg} />
-                <Text style={styles.tileTitle}>Dükkan</Text>
-                <Text style={styles.tileSub}>Kostüm & dostlar</Text>
+          {!soft ? (
+            <FadeInView delay={180}>
+              <Text style={styles.section}>Keşfet</Text>
+              <View style={styles.row}>
+                <BouncePress style={styles.tile} onPress={() => navigation.navigate('Shop')}>
+                  <Image source={require('../../assets/art/mascot.jpg')} style={styles.tileImg} />
+                  <Text style={styles.tileTitle}>Dükkan</Text>
+                  <Text style={styles.tileSub}>Kostüm & dostlar</Text>
+                </BouncePress>
+                <BouncePress style={styles.tile} onPress={() => navigation.navigate('Premium')}>
+                  <Image source={require('../../assets/art/world-map.jpg')} style={styles.tileImg} />
+                  <Text style={styles.tileTitle}>Premium</Text>
+                  <Text style={styles.tileSub}>Reklamsız + her şey</Text>
+                </BouncePress>
+              </View>
+            </FadeInView>
+          ) : (
+            <FadeInView delay={180} style={styles.softExplore}>
+              <BouncePress style={styles.softTile} onPress={() => navigation.navigate('Shop')}>
+                <Text style={styles.softTileText}>Dükkan</Text>
               </BouncePress>
-              <BouncePress style={styles.tile} onPress={() => navigation.navigate('Premium')}>
-                <Image source={require('../../assets/art/world-map.jpg')} style={styles.tileImg} />
-                <Text style={styles.tileTitle}>Premium</Text>
-                <Text style={styles.tileSub}>Reklamsız + her şey</Text>
-              </BouncePress>
-            </View>
-            <BouncePress
-              style={styles.privacyLink}
-              onPress={() => navigation.navigate('Privacy')}
-            >
-              <Text style={styles.privacyText}>Gizlilik politikası</Text>
-            </BouncePress>
-          </FadeInView>
+            </FadeInView>
+          )}
+
+          <BouncePress style={styles.privacyLink} onPress={() => navigation.navigate('Privacy')}>
+            <Text style={styles.privacyText}>Gizlilik politikası</Text>
+          </BouncePress>
         </ScrollView>
       </SafeAreaView>
     </AnimatedBackground>
@@ -98,19 +137,20 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  brand: { fontSize: 28, fontWeight: '900', color: colors.forestDeep, letterSpacing: -0.5 },
+  brand: { fontSize: 30, fontWeight: '900', color: colors.forestDeep, letterSpacing: -0.5 },
   meta: { color: colors.muted, fontWeight: '600', marginTop: 2, fontSize: 13 },
   topRight: { alignItems: 'flex-end', gap: 6 },
   settingsBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 12,
+    minWidth: 56,
+    height: 44,
+    paddingHorizontal: 12,
+    borderRadius: 14,
     backgroundColor: colors.white,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 2,
   },
-  settingsText: { fontSize: 16 },
+  settingsText: { fontSize: 13, fontWeight: '800', color: colors.forestDeep },
   premPill: {
     backgroundColor: colors.sun,
     paddingHorizontal: 10,
@@ -118,7 +158,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   premText: { fontWeight: '800', fontSize: 11, color: colors.forestDeep },
-  privacyLink: { alignSelf: 'center', marginTop: 22, padding: 10 },
+  privacyLink: { alignSelf: 'center', marginTop: 22, padding: 12, minHeight: 44 },
   privacyText: { color: colors.muted, fontWeight: '700', fontSize: 13, textDecorationLine: 'underline' },
   heroCard: {
     marginHorizontal: 16,
@@ -129,7 +169,7 @@ const styles = StyleSheet.create({
   heroCopy: { padding: 18, marginTop: -8 },
   heroTitle: { color: colors.white, fontSize: 24, fontWeight: '900' },
   heroSub: { color: 'rgba(255,255,255,0.8)', marginTop: 4, fontWeight: '600' },
-  actions: { paddingHorizontal: 20, marginTop: 20 },
+  actions: { paddingHorizontal: 20, marginTop: 22 },
   section: {
     marginTop: 28,
     marginHorizontal: 20,
@@ -145,6 +185,7 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     overflow: 'hidden',
     paddingBottom: 14,
+    minHeight: 160,
   },
   tileImg: { width: '100%', height: 100 },
   tileTitle: {
@@ -155,4 +196,13 @@ const styles = StyleSheet.create({
     color: colors.forestDeep,
   },
   tileSub: { marginHorizontal: 12, color: colors.muted, fontSize: 12, marginTop: 2 },
+  softExplore: { paddingHorizontal: 20, marginTop: 24 },
+  softTile: {
+    backgroundColor: colors.card,
+    borderRadius: 22,
+    minHeight: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  softTileText: { fontSize: 18, fontWeight: '800', color: colors.forestDeep },
 });

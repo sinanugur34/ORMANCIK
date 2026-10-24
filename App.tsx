@@ -36,9 +36,32 @@ function RootNav() {
 
   if (!ready) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.cream, gap: 12 }}>
-        <ActivityIndicator size="large" color={colors.forest} />
-        <Text style={{ color: colors.muted, fontWeight: '700' }}>Tiny Grove yükleniyor…</Text>
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: colors.cream,
+          gap: 16,
+          padding: 32,
+        }}
+      >
+        <View
+          style={{
+            width: 88,
+            height: 88,
+            borderRadius: 28,
+            backgroundColor: colors.mint,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <ActivityIndicator size="large" color={colors.forest} />
+        </View>
+        <Text style={{ color: colors.forestDeep, fontWeight: '900', fontSize: 22 }}>Tiny Grove</Text>
+        <Text style={{ color: colors.muted, fontWeight: '600', textAlign: 'center' }}>
+          Orman hazırlanıyor…
+        </Text>
       </View>
     );
   }

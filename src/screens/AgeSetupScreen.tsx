@@ -15,11 +15,15 @@ import { ParentalGate } from '../components/ParentalGate';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { RootStackParamList } from '../navigation/types';
 import { useGame } from '../store/GameContext';
-import { colors } from '../theme/colors';
+import { ageToBand, colors } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AgeSetup'>;
 
-const AGES = [3, 4, 5, 6, 7, 8, 9, 10];
+const BANDS: { id: '3-5' | '6-8' | '9-10'; title: string; hint: string; ages: number[] }[] = [
+  { id: '3-5', title: 'Küçük kaşif', hint: 'Büyük düğmeler · az seçenek', ages: [3, 4, 5] },
+  { id: '6-8', title: 'Orman gezgini', hint: 'Orta zorluk · daha çok oyun', ages: [6, 7, 8] },
+  { id: '9-10', title: 'Koru ustası', hint: 'Daha zor · zamanlı turlar', ages: [9, 10] },
+];
 
 export function AgeSetupScreen({ navigation }: Props) {
   const { setChildAge } = useGame();
@@ -27,7 +31,8 @@ export function AgeSetupScreen({ navigation }: Props) {
   const [gate, setGate] = useState(false);
   const [introDone, setIntroDone] = useState(false);
   const { height } = useWindowDimensions();
-  const heroH = Math.min(height * 0.36, 280);
+  const heroH = Math.min(height * 0.34, 260);
+  const band = ageToBand(age);
 
   const confirm = () => {
     setChildAge(age);
@@ -52,7 +57,7 @@ export function AgeSetupScreen({ navigation }: Props) {
         <SafeAreaView style={styles.heroSafe}>
           <FadeInView>
             <Text style={styles.brand}>Tiny Grove</Text>
-            <Text style={styles.tagline}>Renkli bir dünya, senin yaşında</Text>
+            <Text style={styles.tagline}>Yaşına göre yumuşak bir macera</Text>
           </FadeInView>
         </SafeAreaView>
       </ImageBackground>
@@ -60,25 +65,36 @@ export function AgeSetupScreen({ navigation }: Props) {
       <View style={styles.sheet}>
         <FadeInView delay={80}>
           <Text style={styles.label}>Ebeveyn · çocuğun yaşı</Text>
-          <Text style={styles.hint}>İçerik ve zorluk bu yaşa göre güncellenir.</Text>
+          <Text style={styles.hint}>Gruba göre büyük düğmeler ve zorluk ayarlanır.</Text>
         </FadeInView>
 
-        <View style={styles.grid}>
-          {AGES.map((a) => {
-            const active = a === age;
+        <View style={styles.bandCol}>
+          {BANDS.map((b) => {
+            const active = band === b.id;
             return (
-              <BouncePress
-                key={a}
-                onPress={() => setAge(a)}
-                style={[styles.age, active && styles.ageOn]}
-              >
-                <Text style={[styles.ageText, active && styles.ageTextOn]}>{a}</Text>
-              </BouncePress>
+              <View key={b.id} style={[styles.bandCard, active && styles.bandCardOn]}>
+                <Text style={styles.bandTitle}>{b.title}</Text>
+                <Text style={[styles.bandHint, active && styles.bandHintOn]}>{b.hint}</Text>
+                <View style={styles.ageRow}>
+                  {b.ages.map((a) => {
+                    const on = a === age;
+                    return (
+                      <BouncePress
+                        key={a}
+                        onPress={() => setAge(a)}
+                        style={[styles.age, on && styles.ageOn]}
+                      >
+                        <Text style={[styles.ageText, on && styles.ageTextOn]}>{a}</Text>
+                      </BouncePress>
+                    );
+                  })}
+                </View>
+              </View>
             );
           })}
         </View>
 
-        <PrimaryButton label="Başla" onPress={() => setGate(true)} style={{ marginTop: 4 }} />
+        <PrimaryButton label="Başla" onPress={() => setGate(true)} style={{ marginTop: 8 }} />
       </View>
 
       <ParentalGate
@@ -115,8 +131,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.cream,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    paddingHorizontal: 24,
-    paddingTop: 22,
+    paddingHorizontal: 20,
+    paddingTop: 20,
     paddingBottom: 28,
   },
   label: {
@@ -128,19 +144,29 @@ const styles = StyleSheet.create({
     marginTop: 6,
     color: colors.muted,
     fontSize: 14,
-    marginBottom: 16,
+    marginBottom: 14,
   },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-    marginBottom: 18,
-  },
-  age: {
-    width: '22%',
-    aspectRatio: 1,
-    borderRadius: 18,
+  bandCol: { gap: 12, marginBottom: 12 },
+  bandCard: {
     backgroundColor: colors.white,
+    borderRadius: 22,
+    padding: 14,
+    borderWidth: 2,
+    borderColor: 'rgba(27,122,74,0.1)',
+  },
+  bandCardOn: {
+    borderColor: colors.forest,
+    backgroundColor: 'rgba(168,230,207,0.35)',
+  },
+  bandTitle: { fontSize: 17, fontWeight: '900', color: colors.forestDeep },
+  bandHint: { marginTop: 2, marginBottom: 12, fontSize: 13, color: colors.muted, fontWeight: '600' },
+  bandHintOn: { color: colors.forest },
+  ageRow: { flexDirection: 'row', gap: 10 },
+  age: {
+    width: 56,
+    height: 56,
+    borderRadius: 18,
+    backgroundColor: colors.cream,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,

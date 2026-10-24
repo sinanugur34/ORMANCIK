@@ -111,10 +111,12 @@ const styles = StyleSheet.create({
   skip: {
     alignSelf: 'flex-end',
     marginTop: 18,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    minHeight: 56,
+    paddingVertical: 14,
+    paddingHorizontal: 22,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    justifyContent: 'center',
   },
-  skipText: { color: colors.white, fontWeight: '800', fontSize: 15 },
+  skipText: { color: colors.white, fontWeight: '800', fontSize: 17 },
 });

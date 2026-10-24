@@ -28,7 +28,7 @@ export function MapScreen({ navigation }: Props) {
         <SafeAreaView edges={['top']}>
           <View style={styles.bannerBar}>
             <BouncePress onPress={() => navigation.goBack()} style={styles.back}>
-              <Text style={styles.backText}>←</Text>
+              <Text style={styles.backText}>← Geri</Text>
             </BouncePress>
             <View style={{ flex: 1 }}>
               <Text style={styles.title}>Dünya Haritası</Text>
@@ -100,14 +100,15 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   back: {
-    width: 42,
-    height: 42,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    minWidth: 56,
+    height: 56,
+    paddingHorizontal: 14,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.95)',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backText: { fontSize: 20, fontWeight: '800', color: colors.forestDeep },
+  backText: { fontSize: 16, fontWeight: '800', color: colors.forestDeep },
   title: { color: colors.white, fontSize: 24, fontWeight: '900' },
   sub: { color: 'rgba(255,255,255,0.85)', fontWeight: '600', marginTop: 2 },
   list: { padding: 16, paddingBottom: 48, gap: 14 },
@@ -132,14 +133,14 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   levelDot: {
-    width: 44,
-    height: 44,
-    borderRadius: 14,
+    width: 56,
+    height: 56,
+    borderRadius: 18,
     backgroundColor: colors.mint,
     alignItems: 'center',
     justifyContent: 'center',
   },
   levelDone: { backgroundColor: colors.forest },
   levelLocked: { backgroundColor: 'rgba(92,107,115,0.45)' },
-  levelNum: { fontWeight: '800', color: colors.forestDeep, fontSize: 13 },
+  levelNum: { fontWeight: '800', color: colors.forestDeep, fontSize: 15 },
 });
