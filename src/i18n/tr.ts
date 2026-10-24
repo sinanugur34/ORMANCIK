@@ -25,6 +25,11 @@ export const tr = {
   // App boot
   'app.preparing': 'Orman hazırlanıyor…',
 
+  // First-launch language gate (TR devices only; bilingual copy)
+  'langGate.prompt': 'Türkçe mi / English mi?',
+  'langGate.tr': 'Türkçe',
+  'langGate.en': 'English',
+
   // Cinematic intro
   'intro.frame1': 'Bir koru uyanıyor…',
   'intro.frame2': 'Adalar seni çağırıyor',

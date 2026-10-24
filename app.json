@@ -36,7 +36,10 @@
       "name": "Ormancık",
       "shortName": "Ormancik"
     },
-    "plugins": ["expo-font"],
+    "plugins": [
+      "expo-font",
+      "expo-localization"
+    ],
     "extra": {
       "ageMin": 3,
       "ageMax": 10,

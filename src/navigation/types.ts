@@ -1,4 +1,5 @@
 export type RootStackParamList = {
+  LanguageGate: undefined;
   ProfileSetup: { mode?: 'first' | 'add' } | undefined;
   Home: undefined;
   Map: undefined;

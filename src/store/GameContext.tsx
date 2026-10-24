@@ -10,6 +10,7 @@ import React, {
 import { setVoiceNarrationEnabled } from '../audio/speakPrompt';
 import { COSMETICS } from '../data/cosmetics';
 import { TOTAL_LEVELS } from '../data/islands';
+import { isDeviceTurkish } from '../i18n/deviceLocale';
 import { setLanguage as setI18nLanguage, t, type Language } from '../i18n';
 import { ageToBand, AgeBand } from '../theme/colors';
 
@@ -49,6 +50,11 @@ type DevicePersisted = {
   voiceEnabled: boolean;
   /** Device-level UI + TTS language (TR primary, EN L2). */
   language: Language;
+  /**
+   * True after the user picks on the TR language gate, or after non-TR
+   * devices are silently set to English. Existing saves migrate to true.
+   */
+  languageChosen: boolean;
 };
 
 /** Legacy single-age save shape (pre multi-profile). */
@@ -58,6 +64,7 @@ type LegacyPersisted = {
   premium?: boolean;
   voiceEnabled?: boolean;
   language?: Language;
+  languageChosen?: boolean;
   ownedCosmeticIds?: string[];
   equipped?: Partial<Equipped>;
   clearedLevelIds?: number[];
@@ -82,6 +89,8 @@ type GameContextValue = {
   premium: boolean;
   voiceEnabled: boolean;
   language: Language;
+  /** False only on first launch for Turkish-system devices (LanguageGate). */
+  languageChosen: boolean;
   ageBand: AgeBand | null;
   createProfile: (name: string, age: number) => ChildProfile | null;
   switchProfile: (id: string) => boolean;
@@ -93,6 +102,8 @@ type GameContextValue = {
   setPremium: (v: boolean) => void;
   setVoiceEnabled: (v: boolean) => void;
   setLanguage: (lang: Language) => void;
+  /** First-launch gate: set language and mark languageChosen. */
+  chooseLanguage: (lang: Language) => void;
   ownCosmetic: (id: string) => void;
   equipCosmetic: (id: string) => void;
   clearLevel: (levelId: number, reward: number) => void;
@@ -119,7 +130,25 @@ const defaultDevice: DevicePersisted = {
   premium: false,
   voiceEnabled: true,
   language: 'tr',
+  languageChosen: false,
 };
+
+/** Fresh install: TR devices wait for LanguageGate; all others start in English. */
+function bootstrapFreshInstall(): DevicePersisted {
+  if (isDeviceTurkish()) {
+    return { ...defaultDevice, language: 'tr', languageChosen: false };
+  }
+  return { ...defaultDevice, language: 'en', languageChosen: true };
+}
+
+/**
+ * Existing saves: treat language as already chosen so users are never re-asked.
+ * Explicit `languageChosen: false` is preserved (e.g. after full reset mid-flow).
+ */
+function resolveLanguageChosen(parsed: LegacyPersisted): boolean {
+  if (typeof parsed.languageChosen === 'boolean') return parsed.languageChosen;
+  return true;
+}
 
 function newProfileId(): string {
   return `p-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -168,6 +197,7 @@ function migrateFromRaw(raw: string): DevicePersisted {
       premium: parsed.premium ?? false,
       voiceEnabled: parsed.voiceEnabled ?? true,
       language: normalizeLanguage(parsed.language),
+      languageChosen: resolveLanguageChosen(parsed),
     };
   }
 
@@ -186,6 +216,7 @@ function migrateFromRaw(raw: string): DevicePersisted {
       premium: parsed.premium ?? false,
       voiceEnabled: parsed.voiceEnabled ?? true,
       language: normalizeLanguage(parsed.language),
+      languageChosen: resolveLanguageChosen(parsed),
     };
   }
 
@@ -194,6 +225,7 @@ function migrateFromRaw(raw: string): DevicePersisted {
     premium: parsed.premium ?? false,
     voiceEnabled: parsed.voiceEnabled ?? true,
     language: normalizeLanguage(parsed.language),
+    languageChosen: resolveLanguageChosen(parsed),
   };
 }
 
@@ -229,10 +261,18 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           }
         }
         if (raw) {
-          setState(migrateFromRaw(raw));
+          const migrated = migrateFromRaw(raw);
+          setI18nLanguage(migrated.language);
+          setState(migrated);
+        } else {
+          const fresh = bootstrapFreshInstall();
+          setI18nLanguage(fresh.language);
+          setState(fresh);
         }
       } catch {
-        // keep defaults
+        const fresh = bootstrapFreshInstall();
+        setI18nLanguage(fresh.language);
+        setState(fresh);
       } finally {
         setReady(true);
       }
@@ -336,7 +376,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const setLanguage = useCallback((lang: Language) => {
     const next = normalizeLanguage(lang);
     setI18nLanguage(next);
-    setState((s) => (s.language === next ? s : { ...s, language: next }));
+    setState((s) =>
+      s.language === next && s.languageChosen
+        ? s
+        : { ...s, language: next, languageChosen: true },
+    );
+  }, []);
+
+  const chooseLanguage = useCallback((lang: Language) => {
+    const next = normalizeLanguage(lang);
+    setI18nLanguage(next);
+    setState((s) => ({ ...s, language: next, languageChosen: true }));
   }, []);
 
   const ownCosmetic = useCallback((id: string) => {
@@ -393,7 +443,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   );
 
   const resetProgress = useCallback(() => {
-    setState(defaultDevice);
+    // Full wipe → re-run first-launch language bootstrap (TR gate / silent EN).
+    setState(bootstrapFreshInstall());
   }, []);
 
   const ageBand = useMemo(
@@ -417,6 +468,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       premium: state.premium,
       voiceEnabled: state.voiceEnabled,
       language: state.language,
+      languageChosen: state.languageChosen,
       ageBand,
       createProfile,
       switchProfile,
@@ -428,6 +480,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       setPremium,
       setVoiceEnabled,
       setLanguage,
+      chooseLanguage,
       ownCosmetic,
       equipCosmetic,
       clearLevel,
@@ -440,6 +493,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       state.premium,
       state.voiceEnabled,
       state.language,
+      state.languageChosen,
       ready,
       activeProfile,
       ageBand,
@@ -453,6 +507,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       setPremium,
       setVoiceEnabled,
       setLanguage,
+      chooseLanguage,
       ownCosmetic,
       equipCosmetic,
       clearLevel,

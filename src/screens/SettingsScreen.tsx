@@ -9,6 +9,7 @@ import { PrimaryButton } from '../components/PrimaryButton';
 import { StatusBanner } from '../components/StatusBanner';
 import type { Language } from '../i18n';
 import { useT } from '../i18n';
+import { isDeviceTurkish } from '../i18n/deviceLocale';
 import { MONETIZATION_COPY, USE_MOCK_MONETIZATION } from '../monetization/config';
 import { restorePurchases } from '../monetization/mockIap';
 import { RootStackParamList } from '../navigation/types';
@@ -87,7 +88,11 @@ export function SettingsScreen({ navigation }: Props) {
     if (kind.type === 'reset') {
       resetProgress();
       setBanner({ message: t('settings.resetDone'), tone: 'info' });
-      navigation.reset({ index: 0, routes: [{ name: 'ProfileSetup' }] });
+      // resetProgress re-bootstraps language; only TR devices see LanguageGate.
+      navigation.reset({
+        index: 0,
+        routes: [{ name: isDeviceTurkish() ? 'LanguageGate' : 'ProfileSetup' }],
+      });
       return;
     }
 

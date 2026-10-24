@@ -25,6 +25,10 @@ export const en: Record<TrKey, string> = {
 
   'app.preparing': 'Getting the grove ready…',
 
+  'langGate.prompt': 'Türkçe mi / English mi?',
+  'langGate.tr': 'Türkçe',
+  'langGate.en': 'English',
+
   'intro.frame1': 'A grove is waking…',
   'intro.frame2': 'The islands are calling you',
   'intro.frame3': 'Your friend is ready!',

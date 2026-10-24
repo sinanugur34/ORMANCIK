@@ -6,6 +6,7 @@ import { ActivityIndicator, Platform, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { RootStackParamList } from './src/navigation/types';
 import { HomeScreen } from './src/screens/HomeScreen';
+import { LanguageGateScreen } from './src/screens/LanguageGateScreen';
 import { LevelScreen } from './src/screens/LevelScreen';
 import { MapScreen } from './src/screens/MapScreen';
 import { PlayRoomScreen } from './src/screens/PlayRoomScreen';
@@ -33,7 +34,7 @@ const navTheme = {
 };
 
 function RootNav() {
-  const { ready, activeProfile } = useGame();
+  const { ready, activeProfile, languageChosen } = useGame();
   const t = useT();
 
   if (!ready) {
@@ -70,15 +71,22 @@ function RootNav() {
     );
   }
 
+  const initialRouteName = !languageChosen
+    ? 'LanguageGate'
+    : activeProfile == null
+      ? 'ProfileSetup'
+      : 'Home';
+
   return (
     <Stack.Navigator
-      initialRouteName={activeProfile == null ? 'ProfileSetup' : 'Home'}
+      initialRouteName={initialRouteName}
       screenOptions={{
         headerShown: false,
         animation: 'fade_from_bottom',
         contentStyle: { backgroundColor: colors.cream },
       }}
     >
+      <Stack.Screen name="LanguageGate" component={LanguageGateScreen} />
       <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="Map" component={MapScreen} options={{ animation: 'slide_from_right' }} />
