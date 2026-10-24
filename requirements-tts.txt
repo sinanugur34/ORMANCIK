@@ -1,0 +1,3 @@
+# Female Turkish neural TTS for Ormancık kid prompts (tr-TR-EmelNeural).
+# Install: pip3 install -r requirements-tts.txt
+edge-tts>=6.1.0
