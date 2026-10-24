@@ -12,7 +12,9 @@ import { COSMETICS } from '../data/cosmetics';
 import { TOTAL_LEVELS } from '../data/islands';
 import { ageToBand, AgeBand } from '../theme/colors';
 
-const STORAGE_KEY = 'tiny-grove-v1';
+const STORAGE_KEY = 'ormancik-v1';
+/** Legacy key from Tiny Grove branding — migrated once into STORAGE_KEY. */
+const LEGACY_STORAGE_KEY = 'tiny-grove-v1';
 export const MAX_PROFILES = 4;
 export const PROFILE_NAME_MAX = 12;
 
@@ -203,7 +205,15 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
-        const raw = await AsyncStorage.getItem(STORAGE_KEY);
+        let raw = await AsyncStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+          const legacy = await AsyncStorage.getItem(LEGACY_STORAGE_KEY);
+          if (legacy) {
+            raw = legacy;
+            await AsyncStorage.setItem(STORAGE_KEY, legacy);
+            await AsyncStorage.removeItem(LEGACY_STORAGE_KEY);
+          }
+        }
         if (raw) {
           setState(migrateFromRaw(raw));
         }

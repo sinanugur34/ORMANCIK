@@ -111,7 +111,7 @@ export function PremiumScreen({ navigation }: Props) {
             ) : null}
 
             <FadeInView>
-              <Text style={styles.eyebrow}>Tiny Grove</Text>
+              <Text style={styles.eyebrow}>Ormancık</Text>
               <Text style={styles.title}>Premium</Text>
               <Text style={styles.sub}>
                 Reklamsız, tüm kozmetikler açık — ebeveyn onaylı tek seferlik. Bölümler parayla

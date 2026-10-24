@@ -76,7 +76,7 @@ export function ProfileSetupScreen({ navigation, route }: Props) {
         />
         <SafeAreaView style={styles.heroSafe}>
           <FadeInView>
-            <Text style={styles.brand}>Tiny Grove</Text>
+            <Text style={styles.brand}>Ormancık</Text>
             <Text style={styles.tagline}>
               {isAdd ? 'İkinci (veya yeni) kaşif ekle' : 'İsme ve yaşa göre yumuşak bir macera'}
             </Text>

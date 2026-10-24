@@ -12,7 +12,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Privacy'>;
 const SECTIONS: { title: string; body: string }[] = [
   {
     title: 'Kimler için',
-    body: 'Tiny Grove 3–10 yaş çocuklar için tasarlanmıştır. Ebeveyn yaş seçer; satın alma, reklam ve yaş değişimi ebeveyn onayı ister.',
+    body: 'Ormancık 3–10 yaş çocuklar için tasarlanmıştır. Ebeveyn yaş seçer; satın alma, reklam ve yaş değişimi ebeveyn onayı ister.',
   },
   {
     title: 'Topladığımız veriler',
@@ -28,7 +28,7 @@ const SECTIONS: { title: string; body: string }[] = [
   },
   {
     title: 'İletişim',
-    body: 'Gizlilik talepleri: privacy@tinygrove.app (yayın öncesi gerçek iletişim adresinizle değiştirin). Bu ekran mağaza gönderimi için taslak politikadır; yasal metni avukatınızla kesinleştirin.',
+    body: 'Gizlilik talepleri: privacy@ormancik.app (yayın öncesi gerçek iletişim adresinizle değiştirin). Bu ekran mağaza gönderimi için taslak politikadır; yasal metni avukatınızla kesinleştirin.',
   },
 ];
 
@@ -45,7 +45,7 @@ export function PrivacyScreen({ navigation }: Props) {
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
           <FadeInView>
             <Text style={styles.lead}>
-              Tiny Grove çocuk güvenliği ve mağaza aile politikalarına uygun olacak şekilde tasarlandı.
+              Ormancık çocuk güvenliği ve mağaza aile politikalarına uygun olacak şekilde tasarlandı.
             </Text>
           </FadeInView>
           {SECTIONS.map((s, i) => (

@@ -1,4 +1,4 @@
-# Tiny Grove
+# Ormancık
 
 3–10 yaş için renkli, reklama dayalı + jetonlu kozmetik + tek seferlik Premium çocuk oyunu (Expo / React Native).
 
@@ -57,19 +57,20 @@ Bayrak: [`src/monetization/config.ts`](src/monetization/config.ts) → `USE_MOCK
 - [ ] Google: Designed for Families anketi; Families Policy
 - [ ] Gizlilik URL’si canlı (şu an taslak: uygulama içi + `extra.privacyPolicyUrl`)
 - [ ] Reklam SDK çocuk bayrakları açık; yeniden pazarlama kapalı
-- [ ] IAP ürünleri oluşturuldu (`com.tinygrove.coins.*`, `com.tinygrove.premium`)
+- [ ] IAP ürünleri oluşturuldu (`com.ormancik.coins.*`, `com.ormancik.premium`)
 - [ ] ATT / IDFA kullanılmıyor (çocuk uygulaması)
 - [ ] Ekran görüntüleri: oyun, dükkan+ebeveyn kapısı, gizlilik
 - [ ] Destek e-postası gerçek adres
 
-Ayrıntılı mağaza metni: [`STORE.md`](STORE.md)
+Ayrıntılı mağaza metni + EAS adımları: [`STORE.md`](STORE.md)
 
 ## Gizlilik notları
 
 - İlerleme cihazda (AsyncStorage); hesap zorunlu değil
 - Konum / rehber / mikrofon izni istenmez
 - Uygulama içi ekran: **Gizlilik** (`PrivacyScreen`)
-- Yayın öncesi: yasal metni kesinleştir, `https://tinygrove.app/privacy` yayınla
+- Yayın öncesi: yasal metni kesinleştir, `https://ormancik.app/privacy` yayınla
+- Kayıt anahtarı: `ormancik-v1` (eski `tiny-grove-v1` kayıtları otomatik taşınır)
 
 ## Stack
 
@@ -77,5 +78,5 @@ Expo SDK 58, TypeScript, React Navigation, Reanimated, AsyncStorage, LinearGradi
 
 ## Bundle ID
 
-- iOS / Android: `com.tinygrove.kids`
+- iOS / Android: `com.ormancik.kids`
 - Version: `1.0.0` (iOS buildNumber 1 / Android versionCode 1)

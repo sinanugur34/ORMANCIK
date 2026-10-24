@@ -15,28 +15,28 @@
  */
 export const PRODUCTS = {
   coins_small: {
-    id: 'com.tinygrove.coins.small',
+    id: 'com.ormancik.coins.small',
     type: 'consumable' as const,
     coins: 80,
     label: 'Küçük Torba',
     priceLabel: '₺29,99',
   },
   coins_medium: {
-    id: 'com.tinygrove.coins.medium',
+    id: 'com.ormancik.coins.medium',
     type: 'consumable' as const,
     coins: 220,
     label: 'Orta Torba',
     priceLabel: '₺79,99',
   },
   coins_large: {
-    id: 'com.tinygrove.coins.large',
+    id: 'com.ormancik.coins.large',
     type: 'consumable' as const,
     coins: 600,
     label: 'Büyük Torba',
     priceLabel: '₺149,99',
   },
   premium: {
-    id: 'com.tinygrove.premium',
+    id: 'com.ormancik.premium',
     type: 'non_consumable' as const,
     label: 'Premium',
     priceLabel: '₺199,99',

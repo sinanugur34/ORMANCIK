@@ -58,7 +58,7 @@ function RootNav() {
         >
           <ActivityIndicator size="large" color={colors.forest} />
         </View>
-        <Text style={{ color: colors.forestDeep, fontWeight: '900', fontSize: 22 }}>Tiny Grove</Text>
+        <Text style={{ color: colors.forestDeep, fontWeight: '900', fontSize: 22 }}>Ormancık</Text>
         <Text style={{ color: colors.muted, fontWeight: '600', textAlign: 'center' }}>
           Orman hazırlanıyor…
         </Text>
@@ -91,7 +91,7 @@ function RootNav() {
 export default function App() {
   useEffect(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
-      document.title = 'Tiny Grove';
+      document.title = 'Ormancık';
     }
   }, []);
 
@@ -100,7 +100,7 @@ export default function App() {
       <GameProvider>
         <NavigationContainer
           theme={navTheme}
-          documentTitle={{ enabled: true, formatter: () => 'Tiny Grove' }}
+          documentTitle={{ enabled: true, formatter: () => 'Ormancık' }}
         >
           <StatusBar style="dark" />
           <RootNav />

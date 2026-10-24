@@ -50,7 +50,7 @@ export function HomeScreen({ navigation }: Props) {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 48 }}>
           <View style={styles.topBar}>
             <View style={{ flex: 1, paddingRight: 8 }}>
-              <Text style={styles.brand}>Tiny Grove</Text>
+              <Text style={styles.brand}>Ormancık</Text>
               <Text style={styles.hello}>Merhaba, {childName ?? 'kaşif'}!</Text>
               <Text style={styles.meta}>
                 {soft

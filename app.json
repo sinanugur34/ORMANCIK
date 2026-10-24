@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "Tiny Grove",
-    "slug": "tiny-grove",
+    "name": "Ormancık",
+    "slug": "ormancik",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "scheme": "tinygrove",
+    "scheme": "ormancik",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -14,14 +14,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.tinygrove.kids",
+      "bundleIdentifier": "com.ormancik.kids",
       "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.tinygrove.kids",
+      "package": "com.ormancik.kids",
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#1B7A4A",
@@ -33,15 +33,15 @@
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "name": "Tiny Grove",
-      "shortName": "TinyGrove"
+      "name": "Ormancık",
+      "shortName": "Ormancik"
     },
     "plugins": ["expo-font"],
     "extra": {
       "ageMin": 3,
       "ageMax": 10,
-      "privacyPolicyUrl": "https://tinygrove.app/privacy",
-      "supportEmail": "privacy@tinygrove.app"
+      "privacyPolicyUrl": "https://ormancik.app/privacy",
+      "supportEmail": "privacy@ormancik.app"
     }
   }
 }
