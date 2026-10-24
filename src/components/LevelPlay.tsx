@@ -8,6 +8,7 @@ import Animated, {
   withSequence,
   withSpring,
 } from 'react-native-reanimated';
+import { speakKidPrompt, speakPraise, stopSpeaking } from '../audio/speakPrompt';
 import { LevelDef, starsFromMistakes } from '../data/levels';
 import { AgeBand, colors } from '../theme/colors';
 import { BouncePress } from './Motion';
@@ -60,6 +61,13 @@ export function LevelPlay({ level, band, onWin }: Props) {
     setMemoryFlipped([]);
     setMemoryMatched([]);
   }, [level.id]);
+
+  useEffect(() => {
+    void speakKidPrompt(level.prompt);
+    return () => {
+      void stopSpeaking();
+    };
+  }, [level.id, level.prompt]);
 
   useEffect(() => {
     if (!level.timerSec) return;
@@ -170,6 +178,7 @@ export function LevelPlay({ level, band, onWin }: Props) {
       withSpring(ok ? 1.12 : 0.94, { damping: 10, stiffness: 260 }),
       withSpring(1, { damping: 12, stiffness: 200 }),
     );
+    if (ok) void speakPraise();
     if (!ok) setMistakes((m) => m + 1);
     setTimeout(() => {
       setFeedback('idle');

@@ -12,6 +12,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { speakKidPrompt } from '../audio/speakPrompt';
 import { AnimatedBackground } from '../components/AnimatedBackground';
 import { LevelPlay } from '../components/LevelPlay';
 import { BouncePress, FadeInView } from '../components/Motion';
@@ -58,6 +59,7 @@ export function LevelScreen({ navigation, route }: Props) {
       -1,
       true,
     );
+    void speakKidPrompt('Bravo!');
   }, [won, pulse]);
 
   const devamStyle = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }));

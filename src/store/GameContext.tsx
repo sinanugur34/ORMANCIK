@@ -7,6 +7,7 @@ import React, {
   useMemo,
   useState,
 } from 'react';
+import { setVoiceNarrationEnabled } from '../audio/speakPrompt';
 import { COSMETICS } from '../data/cosmetics';
 import { TOTAL_LEVELS } from '../data/islands';
 import { ageToBand, AgeBand } from '../theme/colors';
@@ -27,6 +28,8 @@ type Persisted = {
   childAge: number | null;
   coins: number;
   premium: boolean;
+  /** Spoken level prompts & praise — default ON for kids. */
+  voiceEnabled: boolean;
   ownedCosmeticIds: string[];
   equipped: Equipped;
   clearedLevelIds: number[];
@@ -40,6 +43,7 @@ type GameContextValue = Persisted & {
   addCoins: (n: number) => void;
   spendCoins: (n: number) => boolean;
   setPremium: (v: boolean) => void;
+  setVoiceEnabled: (v: boolean) => void;
   ownCosmetic: (id: string) => void;
   equipCosmetic: (id: string) => void;
   clearLevel: (levelId: number, reward: number) => void;
@@ -53,6 +57,7 @@ const defaultState: Persisted = {
   childAge: null,
   coins: 40,
   premium: false,
+  voiceEnabled: true,
   ownedCosmeticIds: starterOwned,
   equipped: {
     outfit: 'outfit-leaf',
@@ -79,6 +84,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           setState({
             ...defaultState,
             ...parsed,
+            voiceEnabled: parsed.voiceEnabled ?? true,
             ownedCosmeticIds: parsed.ownedCosmeticIds?.length
               ? parsed.ownedCosmeticIds
               : starterOwned,
@@ -97,6 +103,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (!ready) return;
     AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => undefined);
   }, [state, ready]);
+
+  useEffect(() => {
+    setVoiceNarrationEnabled(state.voiceEnabled);
+  }, [state.voiceEnabled]);
 
   const setChildAge = useCallback((age: number) => {
     setState((s) => ({ ...s, childAge: Math.min(10, Math.max(3, age)) }));
@@ -118,6 +128,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
 
   const setPremium = useCallback((v: boolean) => {
     setState((s) => ({ ...s, premium: v }));
+  }, []);
+
+  const setVoiceEnabled = useCallback((v: boolean) => {
+    setState((s) => ({ ...s, voiceEnabled: v }));
   }, []);
 
   const ownCosmetic = useCallback((id: string) => {
@@ -181,6 +195,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       addCoins,
       spendCoins,
       setPremium,
+      setVoiceEnabled,
       ownCosmetic,
       equipCosmetic,
       clearLevel,
@@ -195,6 +210,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       addCoins,
       spendCoins,
       setPremium,
+      setVoiceEnabled,
       ownCosmetic,
       equipCosmetic,
       clearLevel,

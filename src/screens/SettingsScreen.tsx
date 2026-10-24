@@ -20,7 +20,16 @@ const AGES = [3, 4, 5, 6, 7, 8, 9, 10];
 type GateKind = 'age' | 'restore' | 'reset' | null;
 
 export function SettingsScreen({ navigation }: Props) {
-  const { childAge, setChildAge, premium, setPremium, resetProgress, ownCosmetic } = useGame();
+  const {
+    childAge,
+    setChildAge,
+    premium,
+    setPremium,
+    voiceEnabled,
+    setVoiceEnabled,
+    resetProgress,
+    ownCosmetic,
+  } = useGame();
   const [ageDraft, setAgeDraft] = useState(childAge ?? 5);
   const [gate, setGate] = useState<GateKind>(null);
   const [busy, setBusy] = useState(false);
@@ -95,6 +104,22 @@ export function SettingsScreen({ navigation }: Props) {
           ) : null}
 
           <FadeInView style={styles.card}>
+            <Text style={styles.h}>Sesli yönergeler</Text>
+            <Text style={styles.sub}>
+              Seviye talimatları ve kısa övgüler sesli okunur. Varsayılan: açık.
+            </Text>
+            <BouncePress
+              onPress={() => setVoiceEnabled(!voiceEnabled)}
+              style={[styles.toggleRow, voiceEnabled ? styles.toggleOn : styles.toggleOff]}
+            >
+              <Text style={[styles.toggleLabel, voiceEnabled && styles.toggleLabelOn]}>
+                {voiceEnabled ? 'Açık' : 'Kapalı'}
+              </Text>
+              <View style={[styles.toggleKnob, voiceEnabled && styles.toggleKnobOn]} />
+            </BouncePress>
+          </FadeInView>
+
+          <FadeInView delay={40} style={styles.card}>
             <Text style={styles.h}>Çocuk yaşı</Text>
             <Text style={styles.sub}>Değişiklik ebeveyn onayı ister. Şu an: {childAge ?? '—'}</Text>
             <View style={styles.grid}>
@@ -194,6 +219,27 @@ const styles = StyleSheet.create({
   },
   h: { fontWeight: '900', fontSize: 18, color: colors.forestDeep },
   sub: { marginTop: 6, color: colors.muted, fontWeight: '600', lineHeight: 20 },
+  toggleRow: {
+    marginTop: 14,
+    minHeight: 52,
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  toggleOn: { backgroundColor: colors.forest },
+  toggleOff: { backgroundColor: colors.mint },
+  toggleLabel: { fontWeight: '800', fontSize: 16, color: colors.forestDeep },
+  toggleLabelOn: { color: colors.white },
+  toggleKnob: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.white,
+    opacity: 0.85,
+  },
+  toggleKnobOn: { opacity: 1 },
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 14, marginBottom: 8 },
   age: {
     width: 48,
