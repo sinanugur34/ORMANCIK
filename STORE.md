@@ -1,22 +1,120 @@
-# Ormancık — Store listing & publish runbook
+# Ormancık — Play-first publish runbook
 
-**Status:** Build-ready configs + listing draft. **Not submitted.** Needs Sinan’s Apple Developer / Google Play / Expo accounts.
+**Status:** Android / Play path is config-complete in-repo. **Not submitted** to Google Play or App Store. Needs Sinan’s Expo + Play Console accounts. iOS infrastructure stays ready but deferred (no Apple account required now).
 
-Replace contact URL/email before submit. Mock monetization remains on until production swap checklist is done.
+Replace privacy URL / support email before public release. Mock monetization (`USE_MOCK_MONETIZATION = true`) stays on until production SDK swap — disclose or flip before public listing.
 
 ---
 
-## Title
+## Priority: Google Play (do this now)
 
-**Ormancık**
+### In-repo already verified
 
-## Short description (≤80 chars)
+| Item | Value |
+|------|--------|
+| Display name | **Ormancık** |
+| `android.package` | `com.ormancik.kids` |
+| `version` / `versionCode` | `1.0.0` / `1` (EAS `production` auto-increments remote versionCode) |
+| Orientation | `portrait` |
+| Adaptive icon | foreground / background / monochrome present |
+| Splash | `#1B7A4A` + `./assets/splash-icon.png` |
+| Kids permissions | Mic / camera / location / contacts / broad storage **blocked**; `expo-av` mic permission **off** (playback only) |
+| EAS Android production | `buildType: app-bundle` → **AAB** |
+| EAS submit stub | track `internal`, `releaseStatus: draft`, `changesNotSentForReview: true` |
+| Mock IAP flag | `src/monetization/config.ts` → `USE_MOCK_MONETIZATION = true` (DEMO badge in UI) |
+| Parental gates | Purchases, ads, age change unchanged |
 
+### Asset gaps (non-blocking for first internal track)
+
+- Adaptive foreground / background are **512×512** (Expo accepts; optional upgrade to **1024×1024** for sharper launcher icons)
+- Monochrome **432×432** (OK for Android 13+ themed icon)
+- Splash / app icon **1024×1024** present
+- Still need for listing: **feature graphic** 1024×500, phone screenshots (TR + EN), optional tablet shots
+- No `extra.eas.projectId` yet — created by `eas init` after login
+
+### AAB build & output expectations
+
+```bash
+cd /path/to/ormancik
+npm install
+npm run eas:login
+npm run eas:init              # writes extra.eas.projectId + owner into app.json
+npm run eas:configure         # optional; same as: npx eas-cli@latest build:configure
+npm run play:build            # = eas build --platform android --profile production
+# or explicitly:
+# npx eas-cli@latest build --platform android --profile production
+```
+
+**Where the AAB lands**
+
+1. EAS cloud build finishes → download link in terminal + [expo.dev](https://expo.dev) → project → Builds
+2. Local download path (typical): `./ormancik-*.aab` or whatever path you choose when prompted / `eas build:download`
+3. Artifact name pattern from EAS: `applicationId` `com.ormancik.kids`, versionName `1.0.0`, versionCode auto-bumped
+4. Upload manually in Play Console → Testing → Internal testing → Create release → upload AAB  
+   **or** after linking a Play service account in Expo credentials:
+
+```bash
+npm run play:submit           # = eas submit --platform android --profile production
+```
+
+Submit profile ships to **internal** track as **draft** (safe; does not send for review).
+
+Device APK for sideload QA (not for Play):
+
+```bash
+npm run eas:build:android:preview   # profile preview → APK
+```
+
+---
+
+## Sinan checklist — Play Console (order matters)
+
+### 1. Accounts
+
+- [ ] Google Play Console developer account paid / verified
+- [ ] Expo account; `npm run eas:login` then `npm run eas:init`
+- [ ] Link Android credentials in Expo (or let first `play:build` create a keystore managed by EAS)
+
+### 2. Create the app
+
+- [ ] Play Console → Create app → name **Ormancık**
+- [ ] Package name must match: **`com.ormancik.kids`** (set at create time; cannot change later)
+- [ ] App / game = **Game**; free; Declarations as appropriate
+
+### 3. Content rating
+
+- [ ] Complete IARC questionnaire (no violence, no chat, no UGC public, IAP yes, infrequent ads)
+- [ ] Target age band includes under-13 / kids
+
+### 4. Families / Designed for Families
+
+- [ ] Target audience & content → include children
+- [ ] Designed for Families / Families Policy questionnaire
+- [ ] Affirm parental gates, no behavioral ads, no chat, levels not paywalled
+- [ ] Ads: child-directed / Families self-certified ad SDK when real ads ship
+
+### 5. Data safety
+
+- [ ] Data safety form: progress stored **on device** (AsyncStorage); no account required
+- [ ] Declare IAP / ads data practices honestly once SDKs are live
+- [ ] No location, contacts, mic, camera collection
+- [ ] Privacy policy URL required (see §7)
+
+### 6. Store listing (TR + EN)
+
+**Title:** Ormancık  
+
+**Short description (≤80 chars):**
 ```
 3–10 yaş renkli orman macerası: 80 bölüm, kostümler, ebeveyn korumalı.
 ```
 
-## Full description (TR)
+**EN short (sketch):**
+```
+Ages 3–10 colorful forest adventure: 80 levels, costumes, parental gates.
+```
+
+**Full description (TR)** — paste from below; add EN translation in Play Console locale.
 
 ```
 Ormancık, 3–10 yaş çocuklar için güvenli, renkli bir orman macerası.
@@ -32,161 +130,140 @@ Güvenlik
 • Ebeveyn kapısı: satın alma, reklam, yaş değişimi
 • Zorunlu ara reklam yok
 • Davranışsal reklam hedeflemesi yok
-• Designed for Families / Kids Category uyumlu tasarım
+• Designed for Families uyumlu tasarım
 
-Gizlilik: uygulama içi Gizlilik ekranı + https://ormancik.app/privacy
+Gizlilik: https://ormancik.app/privacy
 Destek: privacy@ormancik.app
 ```
 
-## Keywords (ASO sketch)
+- [ ] Graphics: icon (512), feature graphic 1024×500, phone screenshots (≥2)
+- [ ] Category: Education and/or Casual; tags as appropriate
+- [ ] Contact email + privacy URL
 
-`çocuk oyunu, okul öncesi, öğrenme, renkler, hafıza, kostüm, aile, güvenli, orman, Ormancık`
+### 7. Privacy URL
 
-## Categories
+- [ ] Host live policy at `https://ormancik.app/privacy` (or real domain)
+- [ ] Mirror in Play Console + `app.json` → `extra.privacyPolicyUrl` / `supportEmail`
 
-- Apple: Games → Family / Kids (age band with parental gates)
-- Google: Designed for Families; Education / Casual
-
-## Age rating notes
-
-- No violence, no chat, no user-generated public content
-- In-app purchases present (parental gate on every purchase)
-- Infrequent / parental-gated ads (rewarded only; no interstitial)
-- No behavioral advertising / no IDFA / no ATT prompt intended
-
-## Families / Kids checklist
-
-- [ ] Apple: Kids Category **or** clear age rating + document parental gates in review notes
-- [ ] Google: Designed for Families questionnaire; Families Policy compliance
-- [ ] Host live privacy policy at `https://ormancik.app/privacy` (or your real domain); mirror in ASC + Play + `app.json` `extra.privacyPolicyUrl`
-- [ ] Support email live: update `privacy@ormancik.app` if different
-- [ ] AdMob (or equivalent) Kids flags: child-directed / under-age; no remarketing
-- [ ] IAP products created with IDs below; sandbox tested
-- [ ] Screenshots include: play, shop + parental gate, privacy/settings
-- [ ] `USE_MOCK_MONETIZATION = false` only after real SDKs wired (see below)
-
-## Product IDs (create in both stores)
+### 8. IAP (Play Billing)
 
 | Product | ID | Type |
 |---------|----|------|
 | Küçük Torba | `com.ormancik.coins.small` | consumable |
 | Orta Torba | `com.ormancik.coins.medium` | consumable |
 | Büyük Torba | `com.ormancik.coins.large` | consumable |
-| Premium | `com.ormancik.premium` | non-consumable |
+| Premium | `com.ormancik.premium` | non-consumable (managed / one-time) |
 
-Bundle / package: **`com.ormancik.kids`** (iOS + Android)
+- [ ] Create products in Play Console → Monetize → In-app products
+- [ ] Activate; license-test account purchase before public
+- [ ] **Do not** set `USE_MOCK_MONETIZATION = false` until `react-native-iap` (or equivalent) is wired
 
-## Mock monetization (current)
+### 9. AdMob Kids (when leaving mock ads)
 
-- Flag: `src/monetization/config.ts` → `USE_MOCK_MONETIZATION = true`
+- [ ] AdMob app + **rewarded** unit only (no interstitial / rewarded interstitial as forced)
+- [ ] Child-directed / under-age treatment; no remarketing / MAID for ads personalization
+- [ ] Families Policy–compliant SDK settings
+- [ ] Wire SDK then flip mock flag (production swap below)
+
+### 10. Upload & test track
+
+- [ ] `npm run play:build` → download AAB
+- [ ] Internal testing release (draft) → add testers → smoke on device
+- [ ] Closed / open testing when ready
+- [ ] Production release only after mock monetization off **or** clearly demo-only / no real charges disclosed
+
+### 11. Before public production
+
+- [ ] Production swap checklist complete (below)
+- [ ] DEMO badge gone in production UI
+- [ ] Parental gates re-tested on real purchase / ad sheets
+- [ ] Content rating + Data safety + Families forms green
+
+---
+
+## Mock monetization (current — documented for Play)
+
+- Flag: `src/monetization/config.ts` → **`USE_MOCK_MONETIZATION = true`**
 - UI badge: **DEMO · gerçek ödeme yok**
 - Parental gates still required for mock buy / ad / age change
-- **Do not submit** with mock IAP/ads without disclosing; production builds should flip the flag after SDK wiring
+- Kids safety unchanged while mock is on
+- **Play note:** Internal/closed tracks can ship mock for UX QA; **public production** should ship real Play Billing + AdMob Kids (or remove buy/ad entry points)
 
 ### Production swap checklist
 
-1. EAS native build (preview/production) succeeds
-2. Install Kids-compliant rewarded ad SDK; set unit IDs; child-directed treatment on
+1. EAS Android production AAB succeeds
+2. Install Kids-compliant rewarded ad SDK; unit IDs; child-directed on
 3. Install `react-native-iap` (or Expo-compatible IAP); map `PRODUCTS.*.id`
 4. Set `USE_MOCK_MONETIZATION = false`
-5. Wire restore purchases to store APIs
-6. Activate products in ASC + Play; sandbox purchase + restore
-7. Re-test parental gates on real purchase/ad sheets
-8. Then submit for review
+5. Wire restore purchases to Play Billing
+6. Activate products in Play; license-tester purchase + restore
+7. Re-test parental gates on real sheets
+8. Then promote to production track / send for review
 
-## Screenshots guidance
+---
 
-Capture on a phone-sized viewport (e.g. 1290×2796 iPhone, 1080×1920 Android). Prefer Turkish UI as shipped.
+## Screenshots guidance (Play)
+
+Phone: 1080×1920 or similar. Prefer Turkish UI; add EN locale screenshots when EN listing is live.
 
 1. Home + brand **Ormancık** + hero art  
 2. World map islands  
-3. In-level play (large targets, celebration)  
+3. In-level play  
 4. Play room / costume  
 5. Shop with parental gate visible  
 6. Privacy / settings  
 
-Optional local captures: save under `/opt/cursor/artifacts/` as `ormancik-store-01-home.png` etc. when a computer-use session is available. Existing Tiny Grove-era demos in that folder are visual reference only — recapture after rebrand before submit.
+---
+
+## iOS later (infrastructure ready — not blocking)
+
+Configs kept so ASC work can start without re-architecture:
+
+- `ios.bundleIdentifier`: **`com.ormancik.kids`**
+- `ios.buildNumber`: `1`
+- `eas.json` profiles: `development` (simulator), `preview`, `production` (iOS resource class)
+- Submit stub: `submit.production.ios.ascAppId` = `REPLACE_AFTER_ASC_CREATE`
+- Scripts: `npm run eas:build:ios` / `npm run eas:submit:ios`
+
+**Do not require Apple Developer account for the Play launch.**  
+**Do not claim “submitted to App Store” until ASC binary upload + review request.**
+
+### When ready for App Store Connect
+
+1. Apple Developer Program membership
+2. Create app **Ormancık**, bundle ID `com.ormancik.kids`
+3. Paste listing, privacy URL, age rating (IAP yes; no UGC/chat/violence)
+4. Kids Category **or** age band + Review Notes documenting parental gates
+5. Create same IAP product IDs; sandbox test
+6. Put numeric ASC App ID into `eas.json` → `submit.production.ios.ascAppId`
+7. `npm run eas:build:ios` then `npm run eas:submit:ios`
 
 ---
 
-## What is already done in-repo (no credentials needed)
+## npm scripts (EAS)
 
-- [x] Display name **Ormancık** in UI, web title, README, STORE
-- [x] `app.json` name/slug/scheme + bundle IDs `com.ormancik.kids`
-- [x] IAP IDs `com.ormancik.*`
-- [x] Privacy placeholders `ormancik.app` / `privacy@ormancik.app`
-- [x] AsyncStorage migrate `tiny-grove-v1` → `ormancik-v1`
-- [x] `eas.json` profiles: development / preview / production + submit stubs
-- [x] npm scripts: `eas:login`, `eas:init`, `eas:build:*`, `eas:submit:*`
+| Script | Command |
+|--------|---------|
+| `npm run eas:login` | Expo login |
+| `npm run eas:init` | Create/link EAS project (`projectId`) |
+| `npm run eas:configure` | `eas build:configure` (needs login) |
+| `npm run play:build` | **Android production AAB** |
+| `npm run play:submit` | Submit AAB to Play **internal/draft** |
+| `npm run eas:build:android:preview` | Android **APK** for sideload |
+| `npm run eas:build:ios` | iOS production (later) |
+| `npm run eas:submit:ios` | ASC submit (later) |
 
-**Not done (requires Sinan accounts):** Expo login, EAS projectId, Apple/Google signing, store app creation, binary upload, review submit.
-
----
-
-## Sinan: exact next steps
-
-### A. Expo / EAS (once)
-
-```bash
-cd /path/to/ormancik
-npm install
-npm run eas:login          # Expo account
-npx eas-cli@latest init    # writes extra.eas.projectId + owner into app.json
-```
-
-Link Apple + Google credentials in [expo.dev](https://expo.dev) → project → Credentials (or let `eas build` prompt).
-
-### B. App Store Connect
-
-1. Create app: name **Ormancık**, bundle ID **`com.ormancik.kids`**
-2. Paste short/full description, keywords, screenshots, privacy URL, support URL/email
-3. Age rating questionnaire (IAP yes; no UGC/chat/violence)
-4. Kids / parental gate notes in Review Notes
-5. Create IAP products with IDs above; submit IAPs with the binary
-6. Put ASC App ID into `eas.json` → `submit.production.ios.ascAppId`
-7. Build + submit:
-
-```bash
-npm run eas:build:ios
-npm run eas:submit:ios
-```
-
-### C. Google Play Console
-
-1. Create app: **Ormancık**, package **`com.ormancik.kids`**
-2. Designed for Families / Kids content declarations
-3. Store listing (TR): title, short/full description, graphics
-4. Create in-app products matching IDs above
-5. Privacy policy URL; target audience & content
-6. Upload AAB from production build (internal track first):
-
-```bash
-npm run eas:build:android
-npm run eas:submit:android
-```
-
-### D. Privacy hosting
-
-Publish a real policy page (content can start from in-app `PrivacyScreen`), set:
-
-- Live URL (replace placeholder if not `https://ormancik.app/privacy`)
-- `app.json` → `expo.extra.privacyPolicyUrl` + `supportEmail`
-- Both store consoles
-
-### E. Before public release
-
-- Flip mock monetization off (production swap checklist)
-- Confirm DEMO badge gone in production UI
-- Smoke-test parental gates on device builds
+`eas build:configure` **requires** Expo login — it was not run in CI/agent. Sinan runs it after `eas:login`.
 
 ---
 
-## Manual console steps (summary)
+## What still needs Sinan’s credentials
 
-1. Create apps: `com.ormancik.kids` (iOS + Android) named **Ormancık**
-2. Host real privacy policy URL; set in store consoles + `app.json` extra
-3. Create IAP products matching `src/monetization/products.ts` IDs
-4. Set `USE_MOCK_MONETIZATION = false` after AdMob Kids + react-native-iap wired
-5. `eas login` → `eas init` → `eas build` → upload / `eas submit` → rating questionnaires → submit review
+- Expo login + `eas init` (`extra.eas.projectId`)
+- Play Console app create + Families / Data safety / listing
+- Signing keystore (EAS-managed OK)
+- Service account JSON if using `eas submit` unattended
+- Hosted privacy page
+- Real AdMob + Play Billing before public monetized release
 
-**Do not claim submission until binaries are uploaded and review is requested in the consoles.**
+**Do not claim Play or App Store submission until binaries are uploaded and review is requested in the consoles.**

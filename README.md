@@ -25,6 +25,19 @@ npm start            # Expo Go (iOS/Android)
 npm run typecheck
 ```
 
+## Play Store (öncelik) / iOS sonra
+
+Mağaza runbook: [`STORE.md`](STORE.md) — Play-first checklist; iOS altyapı hazır, ASC ertelenmiş.
+
+```bash
+npm run eas:login
+npm run eas:init
+npm run play:build    # production AAB → EAS cloud; Play’e yükle
+npm run play:submit   # internal/draft (Play service account bağlıysa)
+```
+
+iOS: `npm run eas:build:ios` (Apple hesabı sonra). Bundle: `com.ormancik.kids`.
+
 ## Monetizasyon (mock → üretim)
 
 Bayrak: [`src/monetization/config.ts`](src/monetization/config.ts) → `USE_MOCK_MONETIZATION`

@@ -11,12 +11,16 @@
     "typecheck": "tsc --noEmit",
     "eas:login": "npx eas-cli@latest login",
     "eas:init": "npx eas-cli@latest init",
+    "eas:configure": "npx eas-cli@latest build:configure",
     "eas:build:preview": "npx eas-cli@latest build --profile preview",
-    "eas:build:ios": "npx eas-cli@latest build --platform ios --profile production",
     "eas:build:android": "npx eas-cli@latest build --platform android --profile production",
+    "eas:build:android:preview": "npx eas-cli@latest build --platform android --profile preview",
+    "eas:build:ios": "npx eas-cli@latest build --platform ios --profile production",
     "eas:build:all": "npx eas-cli@latest build --platform all --profile production",
+    "eas:submit:android": "npx eas-cli@latest submit --platform android --profile production",
     "eas:submit:ios": "npx eas-cli@latest submit --platform ios --profile production",
-    "eas:submit:android": "npx eas-cli@latest submit --platform android --profile production"
+    "play:build": "npm run eas:build:android",
+    "play:submit": "npm run eas:submit:android"
   },
   "dependencies": {
     "@expo/metro-runtime": "~58.0.15",
