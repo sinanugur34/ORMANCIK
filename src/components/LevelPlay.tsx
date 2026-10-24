@@ -44,6 +44,8 @@ export function LevelPlay({ level, band, onWin }: Props) {
   const [sortDone, setSortDone] = useState<number[]>([]);
   const [activeBin, setActiveBin] = useState(0);
   const [seqStep, setSeqStep] = useState(0);
+  const [pathStep, setPathStep] = useState(0);
+  const [pathLit, setPathLit] = useState<number[]>([]);
   const [memoryFlipped, setMemoryFlipped] = useState<number[]>([]);
   const [memoryMatched, setMemoryMatched] = useState<number[]>([]);
   const pop = useSharedValue(1);
@@ -58,6 +60,8 @@ export function LevelPlay({ level, band, onWin }: Props) {
     setFeedback('idle');
     setBurst(false);
     setSeqStep(0);
+    setPathStep(0);
+    setPathLit([]);
     setMemoryFlipped([]);
     setMemoryMatched([]);
   }, [level.id]);
@@ -165,6 +169,45 @@ export function LevelPlay({ level, band, onWin }: Props) {
     });
     return shuffle(items);
   }, [level.id, level.colors, level.shapes, optionN, band]);
+
+  const animalOptions = useMemo(() => {
+    const n = band === '3-5' ? Math.min(3, Math.max(2, level.animals.length)) : Math.min(4, level.animals.length);
+    return shuffle(level.animals.slice(0, n));
+  }, [level.id, level.animals, band]);
+
+  const targetAnimal = level.animals[0];
+
+  const pathStones = useMemo(() => {
+    const n = level.pathLength ?? (band === '6-8' ? 3 : 4);
+    return level.colors.slice(0, Math.min(n, level.colors.length));
+  }, [level.pathLength, level.colors, band]);
+
+  const pathTapOptions = useMemo(() => shuffle(pathStones), [pathStones]);
+
+  const quickFindItems = useMemo(() => {
+    const grid = level.findGridSize ?? (band === '9-10' ? 7 : 6);
+    const targetEmoji = level.animals[0]?.emoji ?? '⭐';
+    const distractors = level.animals.slice(1).map((a) => a.emoji);
+    const fillPool =
+      distractors.length > 0
+        ? distractors
+        : level.shapes.length
+          ? level.shapes
+          : ['●', '■', '▲'];
+    const items = Array.from({ length: grid - 1 }, (_, i) => ({
+      id: i,
+      emoji: fillPool[i % fillPool.length],
+      color: level.colors[(i + 1) % level.colors.length],
+      isTarget: false,
+    }));
+    items.push({
+      id: 99,
+      emoji: targetEmoji,
+      color: level.colors[0],
+      isTarget: true,
+    });
+    return shuffle(items);
+  }, [level.id, level.findGridSize, level.animals, level.shapes, level.colors, band]);
 
   const finish = () => {
     const stars = starsFromMistakes(mistakes, band);
@@ -293,7 +336,40 @@ export function LevelPlay({ level, band, onWin }: Props) {
     } else flash(false);
   };
 
+  const onAnimal = (emoji: string) => {
+    if (emoji === targetAnimal?.emoji) {
+      flash(true);
+      bumpProgress();
+    } else flash(false);
+  };
+
+  const onPath = (c: string) => {
+    if (c === pathStones[pathStep]) {
+      flash(true);
+      const lit = [...pathLit, pathStep];
+      setPathLit(lit);
+      const next = pathStep + 1;
+      if (next >= pathStones.length) {
+        setPathStep(0);
+        setPathLit([]);
+        bumpProgress();
+      } else setPathStep(next);
+    } else {
+      flash(false);
+      setPathStep(0);
+      setPathLit([]);
+    }
+  };
+
+  const onQuickFind = (isTarget: boolean) => {
+    if (isTarget) {
+      flash(true);
+      finish();
+    } else flash(false);
+  };
+
   const softProgress = band === '3-5';
+  const animalSize = band === '3-5' ? Math.max(size, 104) : size;
 
   return (
     <Animated.View
@@ -304,7 +380,11 @@ export function LevelPlay({ level, band, onWin }: Props) {
         feedback === 'bad' && styles.wrapBad,
       ]}
     >
-      <SparkleBurst active={burst && feedback === 'good'} tone="good" count={band === '3-5' ? 14 : 11} />
+      <SparkleBurst
+        active={burst && feedback === 'good'}
+        tone="good"
+        count={level.template === 'quickFind' ? 18 : band === '3-5' ? 14 : 11}
+      />
       <SparkleBurst active={burst && feedback === 'bad'} tone="bad" count={6} />
 
       <Animated.Text entering={FadeIn} style={[styles.prompt, softProgress && styles.promptSoft]}>
@@ -595,6 +675,116 @@ export function LevelPlay({ level, band, onWin }: Props) {
           </View>
         </View>
       ) : null}
+
+      {level.template === 'animalMatch' && targetAnimal ? (
+        <View style={styles.grid}>
+          <View style={styles.animalHero}>
+            <Text style={styles.animalHeroEmoji}>{targetAnimal.emoji}</Text>
+            {band !== '9-10' ? (
+              <Text style={styles.animalHeroLabel}>{targetAnimal.label}</Text>
+            ) : null}
+          </View>
+          <View style={styles.row}>
+            {animalOptions.map((a) => (
+              <BouncePress
+                key={a.emoji}
+                onPress={() => onAnimal(a.emoji)}
+                style={[
+                  styles.animalCard,
+                  {
+                    width: animalSize,
+                    height: animalSize,
+                    backgroundColor: colors.cream,
+                  },
+                ]}
+              >
+                <Text style={styles.animalCardEmoji}>{a.emoji}</Text>
+              </BouncePress>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {level.template === 'pathOrder' ? (
+        <View style={styles.grid}>
+          <View style={styles.pathTrack}>
+            {pathStones.map((c, i) => {
+              const done = pathLit.includes(i);
+              const active = i === pathStep;
+              return (
+                <View key={`stone-${i}`} style={styles.pathNodeWrap}>
+                  {i > 0 ? <View style={[styles.pathBridge, done || active ? styles.pathBridgeOn : null]} /> : null}
+                  <View
+                    style={[
+                      styles.pathStone,
+                      {
+                        backgroundColor: c,
+                        opacity: done || active ? 1 : 0.38,
+                        transform: [{ scale: active ? 1.12 : done ? 1.04 : 0.92 }],
+                        width: size * 0.56,
+                        height: size * 0.56,
+                      },
+                    ]}
+                  >
+                    <Text style={styles.pathNum}>{i + 1}</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+          <Text style={styles.pathHint}>
+            {pathStep + 1}. taşı dokun
+          </Text>
+          <View style={[styles.row, { marginTop: 14 }]}>
+            {pathTapOptions.map((c, i) => (
+              <BouncePress
+                key={`path-opt-${c}-${i}`}
+                onPress={() => onPath(c)}
+                style={[
+                  styles.pathTap,
+                  {
+                    backgroundColor: c,
+                    width: size,
+                    height: size,
+                    borderRadius: size * 0.32,
+                  },
+                ]}
+              >
+                <Text style={styles.pathTapGlyph}>◉</Text>
+              </BouncePress>
+            ))}
+          </View>
+        </View>
+      ) : null}
+
+      {level.template === 'quickFind' ? (
+        <View style={styles.grid}>
+          <View style={styles.quickTarget}>
+            <Text style={styles.quickTargetLabel}>Hedef</Text>
+            <Text style={styles.quickTargetEmoji}>
+              {level.animals[0]?.emoji ?? '⭐'}
+            </Text>
+          </View>
+          <View style={styles.quickGrid}>
+            {quickFindItems.map((item) => (
+              <BouncePress
+                key={item.id}
+                onPress={() => onQuickFind(item.isTarget)}
+                style={[
+                  styles.quickCell,
+                  {
+                    backgroundColor: item.color,
+                    width: band === '9-10' ? size * 0.78 : size * 0.88,
+                    height: band === '9-10' ? size * 0.78 : size * 0.88,
+                  },
+                ]}
+              >
+                <Text style={styles.quickCellEmoji}>{item.emoji}</Text>
+              </BouncePress>
+            ))}
+          </View>
+        </View>
+      ) : null}
     </Animated.View>
   );
 }
@@ -733,4 +923,113 @@ const styles = StyleSheet.create({
   },
   binSwatch: { width: 28, height: 28, borderRadius: 10, marginBottom: 4 },
   binLabel: { fontSize: 12, fontWeight: '800', color: colors.forestDeep },
+  animalHero: {
+    alignSelf: 'center',
+    backgroundColor: colors.white,
+    paddingVertical: 16,
+    paddingHorizontal: 28,
+    borderRadius: 28,
+    marginBottom: 20,
+    alignItems: 'center',
+    minWidth: 120,
+    borderWidth: 3,
+    borderColor: 'rgba(168,230,207,0.9)',
+  },
+  animalHeroEmoji: { fontSize: 64, lineHeight: 72 },
+  animalHeroLabel: {
+    marginTop: 4,
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.forest,
+  },
+  animalCard: {
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.95)',
+    minWidth: 88,
+    minHeight: 88,
+  },
+  animalCardEmoji: { fontSize: 44 },
+  pathTrack: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    paddingHorizontal: 4,
+    marginBottom: 4,
+  },
+  pathNodeWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  pathBridge: {
+    width: 18,
+    height: 6,
+    borderRadius: 4,
+    backgroundColor: 'rgba(27,122,74,0.18)',
+    marginHorizontal: 2,
+  },
+  pathBridgeOn: { backgroundColor: colors.leaf },
+  pathStone: {
+    borderRadius: 999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.85)',
+  },
+  pathNum: {
+    fontSize: 18,
+    fontWeight: '900',
+    color: colors.white,
+    textShadowColor: 'rgba(0,0,0,0.25)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  pathHint: {
+    textAlign: 'center',
+    fontWeight: '800',
+    color: colors.forest,
+    marginTop: 10,
+    fontSize: 15,
+  },
+  pathTap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: 'rgba(255,255,255,0.8)',
+    minWidth: 64,
+    minHeight: 64,
+  },
+  pathTapGlyph: { fontSize: 22, color: 'rgba(255,255,255,0.85)', fontWeight: '900' },
+  quickTarget: {
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    backgroundColor: colors.white,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 18,
+    marginBottom: 14,
+  },
+  quickTargetLabel: { fontWeight: '800', color: colors.forest, fontSize: 14 },
+  quickTargetEmoji: { fontSize: 28 },
+  quickGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  quickCell: {
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.75)',
+    minWidth: 52,
+    minHeight: 52,
+  },
+  quickCellEmoji: { fontSize: 28 },
 });
