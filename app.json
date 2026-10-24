@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Tiny Grove",
+    "slug": "tiny-grove",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "scheme": "tinygrove",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.tinygrove.kids",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.tinygrove.kids",
+      "adaptiveIcon": {
+        "backgroundColor": "#1B7A4A",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": ["expo-font"],
+    "extra": {
+      "ageMin": 3,
+      "ageMax": 10
+    }
+  }
+}
