@@ -31,7 +31,8 @@ Replace privacy URL / support email before public release. Mock monetization (`U
 - Adaptive foreground / background are **512×512** (Expo accepts; optional upgrade to **1024×1024** for sharper launcher icons)
 - Monochrome **432×432** (OK for Android 13+ themed icon)
 - Splash / app icon **1024×1024** present
-- Still need for listing: **feature graphic** 1024×500, phone screenshots (TR + EN), optional tablet shots
+- Feature graphic `assets/store/play-feature-1024x500.png` + icon `play-icon-512.png` present
+- Phone screenshots (TR, 1080×1920): `assets/store/screenshots/phone-01.png` … `phone-04.png` (home, map, level, play room). Optional: EN locale shots + tablet
 - No `extra.eas.projectId` yet — created by `eas init` after login
 
 ### AAB build & output expectations
@@ -146,7 +147,7 @@ Gizlilik: https://ormancik.app/privacy
 Destek: privacy@ormancik.app
 ```
 
-- [ ] Graphics: icon (512), feature graphic 1024×500, phone screenshots (≥2)
+- [x] Graphics: icon (512), feature graphic 1024×500, phone screenshots (≥2 TR) — upload from `assets/store/`
 - [ ] Category: Education and/or Casual; tags as appropriate
 - [ ] Contact email + privacy URL
 
