@@ -65,10 +65,18 @@ export function ParentalGate({
           />
           {error ? <Text style={styles.error}>Tekrar dene</Text> : null}
           <View style={styles.row}>
-            <Pressable onPress={onCancel} style={[styles.btn, styles.ghost]}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={onCancel}
+              style={({ pressed }) => [styles.btn, styles.ghost, { opacity: pressed ? 0.85 : 1 }]}
+            >
               <Text style={styles.ghostText}>İptal</Text>
             </Pressable>
-            <Pressable onPress={submit} style={[styles.btn, styles.primary]}>
+            <Pressable
+              accessibilityRole="button"
+              onPress={submit}
+              style={({ pressed }) => [styles.btn, styles.primary, { opacity: pressed ? 0.85 : 1 }]}
+            >
               <Text style={styles.primaryText}>Onayla</Text>
             </Pressable>
           </View>

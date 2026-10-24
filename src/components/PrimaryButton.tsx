@@ -26,11 +26,16 @@ export function PrimaryButton({
 }: Props) {
   return (
     <Pressable
+      accessibilityRole="button"
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
         styles.btn,
-        { backgroundColor: tones[tone], opacity: disabled ? 0.45 : pressed ? 0.88 : 1 },
+        {
+          backgroundColor: tones[tone],
+          opacity: disabled ? 0.45 : pressed ? 0.88 : 1,
+          cursor: disabled ? 'default' : 'pointer',
+        } as object,
         style,
       ]}
     >

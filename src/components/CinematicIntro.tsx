@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   FadeIn,
   FadeOut,
@@ -64,6 +64,9 @@ export function CinematicIntro({ onDone }: Props) {
         <View style={styles.track}>
           <Animated.View style={[styles.fill, bar]} />
         </View>
+        <Pressable accessibilityRole="button" onPress={onDone} style={styles.skip}>
+          <Text style={styles.skipText}>Atla →</Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -105,4 +108,13 @@ const styles = StyleSheet.create({
     backgroundColor: colors.sun,
     borderRadius: 999,
   },
+  skip: {
+    alignSelf: 'flex-end',
+    marginTop: 18,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+  },
+  skipText: { color: colors.white, fontWeight: '800', fontSize: 15 },
 });

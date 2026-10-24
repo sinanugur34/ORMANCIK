@@ -49,6 +49,7 @@ function FloatingBlob({ size, left, top, color, delay }: Blob) {
 
   return (
     <Animated.View
+      pointerEvents="none"
       style={[
         styles.blob,
         { width: size, height: size, borderRadius: size / 2, left, top, backgroundColor: color },
@@ -67,7 +68,11 @@ function Sparkle({ left, top, delay }: { left: number; top: number; delay: numbe
     );
   }, [delay, o]);
   const style = useAnimatedStyle(() => ({ opacity: o.value }));
-  return <Animated.Text style={[styles.sparkle, { left, top }, style]}>✦</Animated.Text>;
+  return (
+    <Animated.Text pointerEvents="none" style={[styles.sparkle, { left, top }, style]}>
+      ✦
+    </Animated.Text>
+  );
 }
 
 type Props = {

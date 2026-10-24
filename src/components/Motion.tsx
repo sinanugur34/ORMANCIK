@@ -4,14 +4,11 @@ import Animated, {
   Easing,
   FadeInDown,
   FadeInUp,
-  FadeOut,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
-
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export function FadeInView({
   children,
@@ -26,12 +23,13 @@ export function FadeInView({
 }) {
   const entering = from === 'up' ? FadeInUp.delay(delay).springify() : FadeInDown.delay(delay).springify();
   return (
-    <Animated.View entering={entering} exiting={FadeOut} style={style}>
+    <Animated.View entering={entering} style={style}>
       {children}
     </Animated.View>
   );
 }
 
+/** Web-safe pressable: native Pressable + animated wrapper (AnimatedPressable breaks clicks on RN Web). */
 export function BouncePress({
   children,
   onPress,
@@ -47,19 +45,25 @@ export function BouncePress({
   const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   return (
-    <AnimatedPressable
-      disabled={disabled}
-      onPressIn={() => {
-        scale.value = withTiming(0.94, { duration: 90 });
-      }}
-      onPressOut={() => {
-        scale.value = withSpring(1, { damping: 12, stiffness: 220 });
-      }}
-      onPress={onPress}
-      style={[anim, style]}
-    >
-      {children}
-    </AnimatedPressable>
+    <Animated.View style={anim}>
+      <Pressable
+        accessibilityRole="button"
+        disabled={disabled}
+        onPressIn={() => {
+          scale.value = withTiming(0.96, { duration: 80 });
+        }}
+        onPressOut={() => {
+          scale.value = withSpring(1, { damping: 14, stiffness: 220 });
+        }}
+        onPress={onPress}
+        style={({ pressed }) => [
+          style,
+          { cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.45 : pressed ? 0.9 : 1 } as ViewStyle,
+        ]}
+      >
+        {children}
+      </Pressable>
+    </Animated.View>
   );
 }
 
@@ -79,5 +83,5 @@ export function Pulse({ children, style }: { children: React.ReactNode; style?: 
     return () => clearInterval(id);
   }, [s]);
   const anim = useAnimatedStyle(() => ({ transform: [{ scale: s.value }] }));
-  return <Animated.View style={[anim, style]}>{children}</Animated.View>;
+  return <Animated.View style={[anim, style]} pointerEvents="box-none">{children}</Animated.View>;
 }
