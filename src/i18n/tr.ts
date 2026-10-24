@@ -18,6 +18,7 @@ export const tr = {
   'common.explorer': 'kaşif',
   'common.player': 'Oyuncu',
   'common.brand': 'Ormancık',
+  'brand.name': 'Ormancık',
   'common.seconds': '{n} sn',
   'common.coins': '{n} jeton',
   'common.plusCoins': '+{n} jeton',

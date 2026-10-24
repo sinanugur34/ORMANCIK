@@ -12,8 +12,10 @@ Replace privacy URL / support email before public release. Mock monetization (`U
 
 | Item | Value |
 |------|--------|
-| Display name | **Ormancık** |
-| `android.package` | `com.ormancik.kids` |
+| Display name (TR listing) | **Ormancık** |
+| Display name (EN listing) | **Woodlet** |
+| In-app brand | `brand.name` → Ormancık (tr) / Woodlet (en) |
+| `android.package` | `com.ormancik.kids` (unchanged; do not rename to woodlet) |
 | `version` / `versionCode` | `1.0.0` / `1` (EAS `production` auto-increments remote versionCode) |
 | Orientation | `portrait` |
 | Adaptive icon | foreground / background / monochrome present |
@@ -77,8 +79,8 @@ npm run eas:build:android:preview   # profile preview → APK
 
 ### 2. Create the app
 
-- [ ] Play Console → Create app → name **Ormancık**
-- [ ] Package name must match: **`com.ormancik.kids`** (set at create time; cannot change later)
+- [ ] Play Console → Create app → default/TR name **Ormancık** (EN store listing title **Woodlet**)
+- [ ] Package name must match: **`com.ormancik.kids`** (set at create time; cannot change later — not woodlet)
 - [ ] App / game = **Game**; free; Declarations as appropriate
 
 ### 3. Content rating
@@ -102,19 +104,27 @@ npm run eas:build:android:preview   # profile preview → APK
 
 ### 6. Store listing (TR + EN)
 
-**Title:** Ormancık  
+| Locale | App name (Play Console) |
+|--------|-------------------------|
+| Turkish (tr) | **Ormancık** |
+| English (en) | **Woodlet** |
 
-**Short description (≤80 chars):**
+Package / applicationId stays **`com.ormancik.kids`**. EN listing may optionally mention Ormancık as the original Turkish name in the short or full description.
+
+**Title (TR):** Ormancık  
+**Title (EN):** Woodlet  
+
+**Short description TR (≤80 chars):**
 ```
 3–10 yaş renkli orman macerası: 80 bölüm, kostümler, ebeveyn korumalı.
 ```
 
 **EN short (sketch):**
 ```
-Ages 3–10 colorful forest adventure: 80 levels, costumes, parental gates.
+Woodlet — ages 3–10 forest adventure (Ormancık). 80 levels, costumes, parental gates.
 ```
 
-**Full description (TR)** — paste from below; add EN translation in Play Console locale.
+**Full description (TR)** — paste from below; add EN translation in Play Console locale (EN title Woodlet).
 
 ```
 Ormancık, 3–10 yaş çocuklar için güvenli, renkli bir orman macerası.
@@ -206,7 +216,7 @@ Destek: privacy@ormancik.app
 
 Phone: 1080×1920 or similar. Prefer Turkish UI; add EN locale screenshots when EN listing is live.
 
-1. Home + brand **Ormancık** + hero art  
+1. Home + brand (**Ormancık** TR / **Woodlet** EN) + hero art  
 2. World map islands  
 3. In-level play  
 4. Play room / costume  
@@ -231,7 +241,7 @@ Configs kept so ASC work can start without re-architecture:
 ### When ready for App Store Connect
 
 1. Apple Developer Program membership
-2. Create app **Ormancık**, bundle ID `com.ormancik.kids`
+2. Create app **Ormancık** (EN listing **Woodlet**), bundle ID `com.ormancik.kids`
 3. Paste listing, privacy URL, age rating (IAP yes; no UGC/chat/violence)
 4. Kids Category **or** age band + Review Notes documenting parental gates
 5. Create same IAP product IDs; sandbox test

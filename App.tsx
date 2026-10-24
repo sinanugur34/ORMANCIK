@@ -15,7 +15,7 @@ import { PrivacyScreen } from './src/screens/PrivacyScreen';
 import { ProfileSetupScreen } from './src/screens/ProfileSetupScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { ShopScreen } from './src/screens/ShopScreen';
-import { useT } from './src/i18n';
+import { useLanguage, useT } from './src/i18n';
 import { GameProvider, useGame } from './src/store/GameContext';
 import { colors } from './src/theme/colors';
 
@@ -62,7 +62,7 @@ function RootNav() {
           <ActivityIndicator size="large" color={colors.forest} />
         </View>
         <Text style={{ color: colors.forestDeep, fontWeight: '900', fontSize: 22 }}>
-          {t('common.brand')}
+          {t('brand.name')}
         </Text>
         <Text style={{ color: colors.muted, fontWeight: '600', textAlign: 'center' }}>
           {t('app.preparing')}
@@ -100,23 +100,39 @@ function RootNav() {
   );
 }
 
-export default function App() {
+function DocumentTitleSync() {
+  const t = useT();
+  const language = useLanguage();
+  const brand = t('brand.name');
+
   useEffect(() => {
     if (Platform.OS === 'web' && typeof document !== 'undefined') {
-      document.title = 'Ormancık';
+      document.title = brand;
     }
-  }, []);
+  }, [brand, language]);
 
+  return null;
+}
+
+function AppNavigation() {
+  const t = useT();
+  return (
+    <NavigationContainer
+      theme={navTheme}
+      documentTitle={{ enabled: true, formatter: () => t('brand.name') }}
+    >
+      <DocumentTitleSync />
+      <StatusBar style="dark" />
+      <RootNav />
+    </NavigationContainer>
+  );
+}
+
+export default function App() {
   return (
     <SafeAreaProvider>
       <GameProvider>
-        <NavigationContainer
-          theme={navTheme}
-          documentTitle={{ enabled: true, formatter: () => 'Ormancık' }}
-        >
-          <StatusBar style="dark" />
-          <RootNav />
-        </NavigationContainer>
+        <AppNavigation />
       </GameProvider>
     </SafeAreaProvider>
   );

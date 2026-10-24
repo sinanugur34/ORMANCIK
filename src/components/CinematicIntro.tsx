@@ -70,7 +70,7 @@ export function CinematicIntro({ onDone }: Props) {
         style={styles.grad}
       />
       <View style={styles.copy}>
-        <Text style={styles.brand}>{t('common.brand')}</Text>
+        <Text style={styles.brand}>{t('brand.name')}</Text>
         <Animated.Text key={`l-${frame}`} entering={FadeIn} style={styles.line}>
           {current.line}
         </Animated.Text>

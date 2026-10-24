@@ -31,7 +31,7 @@ export function LanguageGateScreen({ navigation }: Props) {
     <LinearGradient colors={['#E8F8EF', colors.cream, '#FFF0D6']} style={styles.root}>
       <SafeAreaView style={styles.safe}>
         <FadeInView style={styles.header}>
-          <Text style={styles.brand}>{tFor('tr', 'common.brand')}</Text>
+          <Text style={styles.brand}>{tFor('tr', 'brand.name')}</Text>
           <Text style={styles.prompt}>{tFor('tr', 'langGate.prompt')}</Text>
         </FadeInView>
 

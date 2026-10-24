@@ -18,7 +18,8 @@ export const en: Record<TrKey, string> = {
   'common.inactive': 'off',
   'common.explorer': 'explorer',
   'common.player': 'Player',
-  'common.brand': 'Ormancık',
+  'common.brand': 'Woodlet',
+  'brand.name': 'Woodlet',
   'common.seconds': '{n} s',
   'common.coins': '{n} coins',
   'common.plusCoins': '+{n} coins',
@@ -287,10 +288,10 @@ export const en: Record<TrKey, string> = {
 
   'privacy.title': 'Privacy',
   'privacy.lead':
-    'Ormancık is designed to align with child safety and store family policies.',
+    'Woodlet is designed to align with child safety and store family policies.',
   'privacy.s1.title': 'Who it’s for',
   'privacy.s1.body':
-    'Ormancık is designed for ages 3–10. A parent sets the age; purchases, ads, and age changes require parent approval.',
+    'Woodlet is designed for ages 3–10. A parent sets the age; purchases, ads, and age changes require parent approval.',
   'privacy.s2.title': 'Data we keep',
   'privacy.s2.body':
     'Game progress, coins, and cosmetic choices stay on the device (AsyncStorage). No account is required. We do not collect child identity, location, or advertising IDs.',

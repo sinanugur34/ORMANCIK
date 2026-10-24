@@ -88,7 +88,7 @@ export function ProfileSetupScreen({ navigation, route }: Props) {
         />
         <SafeAreaView style={styles.heroSafe}>
           <FadeInView>
-            <Text style={styles.brand}>{t('common.brand')}</Text>
+            <Text style={styles.brand}>{t('brand.name')}</Text>
             <Text style={styles.tagline}>
               {isAdd ? t('profile.taglineAdd') : t('profile.taglineFirst')}
             </Text>

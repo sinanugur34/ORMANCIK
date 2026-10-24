@@ -55,7 +55,7 @@ export function HomeScreen({ navigation }: Props) {
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 48 }}>
           <View style={styles.topBar}>
             <View style={{ flex: 1, paddingRight: 8 }}>
-              <Text style={styles.brand}>{t('common.brand')}</Text>
+              <Text style={styles.brand}>{t('brand.name')}</Text>
               <Text style={styles.hello}>{t('home.hello', { name: explorer })}</Text>
               <Text style={styles.meta}>
                 {soft

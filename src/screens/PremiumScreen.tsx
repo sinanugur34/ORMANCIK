@@ -116,7 +116,7 @@ export function PremiumScreen({ navigation }: Props) {
             ) : null}
 
             <FadeInView>
-              <Text style={styles.eyebrow}>{t('common.brand')}</Text>
+              <Text style={styles.eyebrow}>{t('brand.name')}</Text>
               <Text style={styles.title}>{t('premium.title')}</Text>
               <Text style={styles.sub}>{t('premium.sub')}</Text>
             </FadeInView>
