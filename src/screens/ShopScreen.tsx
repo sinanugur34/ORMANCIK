@@ -1,13 +1,15 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimatedBackground } from '../components/AnimatedBackground';
 import { CoinBadge } from '../components/CoinBadge';
 import { BouncePress, FadeInView } from '../components/Motion';
 import { ParentalGate } from '../components/ParentalGate';
 import { PrimaryButton } from '../components/PrimaryButton';
+import { StatusBanner } from '../components/StatusBanner';
 import { COSMETICS, KIND_LABEL, CosmeticKind } from '../data/cosmetics';
+import { MONETIZATION_COPY, USE_MOCK_MONETIZATION } from '../monetization/config';
 import { REWARDED_COIN_AMOUNT, showRewardedAd } from '../monetization/mockAds';
 import { purchaseCoinPack } from '../monetization/mockIap';
 import { PRODUCTS, CoinPackKey } from '../monetization/products';
@@ -34,18 +36,26 @@ export function ShopScreen({ navigation }: Props) {
   } = useGame();
   const [gate, setGate] = useState<GateAction>(null);
   const [busy, setBusy] = useState(false);
+  const [banner, setBanner] = useState<{ message: string; tone: 'ok' | 'error' | 'info' | 'warn' } | null>(
+    null,
+  );
 
   const buyCosmetic = (id: string, price: number) => {
     if (premium || ownedCosmeticIds.includes(id)) {
       equipCosmetic(id);
+      setBanner({ message: 'Takıldı!', tone: 'ok' });
       return;
     }
     if (!spendCoins(price)) {
-      Alert.alert('Jeton yetmiyor', 'Bölüm oyna, reklam izle veya jeton paketi al.');
+      setBanner({
+        message: 'Jeton yetmiyor. Bölüm oyna, reklam izle veya jeton paketi al.',
+        tone: 'warn',
+      });
       return;
     }
     ownCosmetic(id);
     equipCosmetic(id);
+    setBanner({ message: 'Satın alındı ve takıldı!', tone: 'ok' });
   };
 
   const runGateSuccess = async () => {
@@ -53,18 +63,42 @@ export function ShopScreen({ navigation }: Props) {
     setGate(null);
     if (!action) return;
     setBusy(true);
+    setBanner(null);
     try {
       if (action.type === 'ad') {
         if (premium) {
           addCoins(REWARDED_COIN_AMOUNT);
+          setBanner({ message: `+${REWARDED_COIN_AMOUNT} jeton (Premium, reklamsız)`, tone: 'ok' });
         } else {
           const res = await showRewardedAd();
-          if (res.rewarded) addCoins(REWARDED_COIN_AMOUNT);
+          if (res.rewarded) {
+            addCoins(REWARDED_COIN_AMOUNT);
+            setBanner({
+              message: res.mock
+                ? `+${REWARDED_COIN_AMOUNT} jeton · ${MONETIZATION_COPY.mockAdNote}`
+                : `+${REWARDED_COIN_AMOUNT} jeton`,
+              tone: 'ok',
+            });
+          } else {
+            setBanner({ message: res.error ?? 'Ödül alınamadı.', tone: 'error' });
+          }
         }
       } else {
         const res = await purchaseCoinPack(action.key);
-        if (res.ok && res.coins) addCoins(res.coins);
+        if (res.ok && res.coins) {
+          addCoins(res.coins);
+          setBanner({
+            message: res.mock
+              ? `+${res.coins} jeton · ${MONETIZATION_COPY.mockIapNote}`
+              : `+${res.coins} jeton eklendi`,
+            tone: 'ok',
+          });
+        } else if (!res.ok) {
+          setBanner({ message: res.reason, tone: 'error' });
+        }
       }
+    } catch {
+      setBanner({ message: 'Bir hata oluştu. Tekrar dene.', tone: 'error' });
     } finally {
       setBusy(false);
     }
@@ -84,16 +118,23 @@ export function ShopScreen({ navigation }: Props) {
         </View>
 
         <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          {USE_MOCK_MONETIZATION ? (
+            <StatusBanner message={MONETIZATION_COPY.mockBadge} tone="warn" style={{ marginBottom: 10 }} />
+          ) : null}
+          {banner ? (
+            <StatusBanner message={banner.message} tone={banner.tone} style={{ marginBottom: 10 }} />
+          ) : null}
+
           <FadeInView>
             <View style={styles.earnCard}>
               <Text style={styles.earnTitle}>Jeton kazan</Text>
               <Text style={styles.earnSub}>
                 {premium
                   ? 'Premium: ödül jetonları reklamsız'
-                  : 'Ödüllü reklam (ebeveyn onayı)'}
+                  : 'Ödüllü reklam (ebeveyn onayı) · zorunlu ara reklam yok'}
               </Text>
               <PrimaryButton
-                label={busy ? '…' : `+${REWARDED_COIN_AMOUNT} jeton`}
+                label={busy ? 'Yükleniyor…' : `+${REWARDED_COIN_AMOUNT} jeton`}
                 tone="sun"
                 disabled={busy}
                 onPress={() => setGate({ type: 'ad' })}
@@ -112,6 +153,7 @@ export function ShopScreen({ navigation }: Props) {
                   return (
                     <BouncePress
                       key={key}
+                      disabled={busy}
                       style={styles.pack}
                       onPress={() => setGate({ type: 'pack', key: key as CoinPackKey })}
                     >
@@ -124,29 +166,36 @@ export function ShopScreen({ navigation }: Props) {
             </View>
           </FadeInView>
 
-          {kinds.map((kind, ki) => (
-            <FadeInView key={kind} delay={120 + ki * 40}>
-              <Text style={styles.section}>{KIND_LABEL[kind]}</Text>
-              <View style={styles.grid}>
-                {COSMETICS.filter((c) => c.kind === kind).map((c) => {
-                  const owned = premium || ownedCosmeticIds.includes(c.id);
-                  return (
-                    <BouncePress
-                      key={c.id}
-                      style={styles.item}
-                      onPress={() => buyCosmetic(c.id, c.price)}
-                    >
-                      <Text style={styles.itemEmoji}>{c.emoji}</Text>
-                      <Text style={styles.itemName}>{c.name}</Text>
-                      <Text style={styles.itemPrice}>
-                        {owned ? 'Tak' : c.price === 0 ? 'Ücretsiz' : `${c.price} 🪙`}
-                      </Text>
-                    </BouncePress>
-                  );
-                })}
-              </View>
-            </FadeInView>
-          ))}
+          {kinds.map((kind, ki) => {
+            const items = COSMETICS.filter((c) => c.kind === kind);
+            return (
+              <FadeInView key={kind} delay={120 + ki * 40}>
+                <Text style={styles.section}>{KIND_LABEL[kind]}</Text>
+                {items.length === 0 ? (
+                  <StatusBanner message="Bu kategoride ürün yok." tone="info" />
+                ) : (
+                  <View style={styles.grid}>
+                    {items.map((c) => {
+                      const owned = premium || ownedCosmeticIds.includes(c.id);
+                      return (
+                        <BouncePress
+                          key={c.id}
+                          style={styles.item}
+                          onPress={() => buyCosmetic(c.id, c.price)}
+                        >
+                          <Text style={styles.itemEmoji}>{c.emoji}</Text>
+                          <Text style={styles.itemName}>{c.name}</Text>
+                          <Text style={styles.itemPrice}>
+                            {owned ? 'Tak' : c.price === 0 ? 'Ücretsiz' : `${c.price} 🪙`}
+                          </Text>
+                        </BouncePress>
+                      );
+                    })}
+                  </View>
+                )}
+              </FadeInView>
+            );
+          })}
 
           <PrimaryButton
             label="Premium'a bak"

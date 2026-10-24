@@ -85,6 +85,7 @@ export function LevelScreen({ navigation, route }: Props) {
                   style={{ marginTop: 10 }}
                   onPress={() => {
                     setWon(false);
+                    // clearLevel already unlocked levelId+1
                     navigation.replace('Level', { levelId: levelId + 1 });
                   }}
                 />

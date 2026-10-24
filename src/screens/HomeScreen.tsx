@@ -29,6 +29,9 @@ export function HomeScreen({ navigation }: Props) {
               </Text>
             </View>
             <View style={styles.topRight}>
+              <BouncePress onPress={() => navigation.navigate('Settings')} style={styles.settingsBtn}>
+                <Text style={styles.settingsText}>⚙</Text>
+              </BouncePress>
               <CoinBadge coins={coins} />
               {premium ? (
                 <View style={styles.premPill}>
@@ -72,6 +75,12 @@ export function HomeScreen({ navigation }: Props) {
                 <Text style={styles.tileSub}>Reklamsız + her şey</Text>
               </BouncePress>
             </View>
+            <BouncePress
+              style={styles.privacyLink}
+              onPress={() => navigation.navigate('Privacy')}
+            >
+              <Text style={styles.privacyText}>Gizlilik politikası</Text>
+            </BouncePress>
           </FadeInView>
         </ScrollView>
       </SafeAreaView>
@@ -92,6 +101,16 @@ const styles = StyleSheet.create({
   brand: { fontSize: 28, fontWeight: '900', color: colors.forestDeep, letterSpacing: -0.5 },
   meta: { color: colors.muted, fontWeight: '600', marginTop: 2, fontSize: 13 },
   topRight: { alignItems: 'flex-end', gap: 6 },
+  settingsBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 2,
+  },
+  settingsText: { fontSize: 16 },
   premPill: {
     backgroundColor: colors.sun,
     paddingHorizontal: 10,
@@ -99,6 +118,8 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   premText: { fontWeight: '800', fontSize: 11, color: colors.forestDeep },
+  privacyLink: { alignSelf: 'center', marginTop: 22, padding: 10 },
+  privacyText: { color: colors.muted, fontWeight: '700', fontSize: 13, textDecorationLine: 'underline' },
   heroCard: {
     marginHorizontal: 16,
     borderRadius: 28,

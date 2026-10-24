@@ -3,7 +3,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import React, { useState } from 'react';
 import {
   ImageBackground,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -28,6 +27,7 @@ export function AgeSetupScreen({ navigation }: Props) {
   const [gate, setGate] = useState(false);
   const [introDone, setIntroDone] = useState(false);
   const { height } = useWindowDimensions();
+  const heroH = Math.min(height * 0.36, 280);
 
   const confirm = () => {
     setChildAge(age);
@@ -42,7 +42,7 @@ export function AgeSetupScreen({ navigation }: Props) {
     <View style={styles.root}>
       <ImageBackground
         source={require('../../assets/art/hero-grove.jpg')}
-        style={{ height: height * 0.48 }}
+        style={{ height: heroH }}
         resizeMode="cover"
       >
         <LinearGradient
@@ -58,27 +58,27 @@ export function AgeSetupScreen({ navigation }: Props) {
       </ImageBackground>
 
       <View style={styles.sheet}>
-        <ScrollView contentContainerStyle={styles.sheetInner} showsVerticalScrollIndicator={false}>
-          <FadeInView delay={120}>
-            <Text style={styles.label}>Ebeveyn · çocuğun yaşı</Text>
-            <Text style={styles.hint}>İçerik ve zorluk bu yaşa göre güncellenir.</Text>
-          </FadeInView>
+        <FadeInView delay={80}>
+          <Text style={styles.label}>Ebeveyn · çocuğun yaşı</Text>
+          <Text style={styles.hint}>İçerik ve zorluk bu yaşa göre güncellenir.</Text>
+        </FadeInView>
 
-          <View style={styles.grid}>
-            {AGES.map((a, i) => {
-              const active = a === age;
-              return (
-                <FadeInView key={a} delay={80 + i * 40} style={styles.cell}>
-                  <BouncePress onPress={() => setAge(a)} style={[styles.age, active && styles.ageOn]}>
-                    <Text style={[styles.ageText, active && styles.ageTextOn]}>{a}</Text>
-                  </BouncePress>
-                </FadeInView>
-              );
-            })}
-          </View>
+        <View style={styles.grid}>
+          {AGES.map((a) => {
+            const active = a === age;
+            return (
+              <BouncePress
+                key={a}
+                onPress={() => setAge(a)}
+                style={[styles.age, active && styles.ageOn]}
+              >
+                <Text style={[styles.ageText, active && styles.ageTextOn]}>{a}</Text>
+              </BouncePress>
+            );
+          })}
+        </View>
 
-          <PrimaryButton label="Başla" onPress={() => setGate(true)} style={{ marginTop: 8 }} />
-        </ScrollView>
+        <PrimaryButton label="Başla" onPress={() => setGate(true)} style={{ marginTop: 4 }} />
       </View>
 
       <ParentalGate
@@ -96,28 +96,29 @@ export function AgeSetupScreen({ navigation }: Props) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.cream },
-  heroSafe: { flex: 1, justifyContent: 'flex-end', padding: 24, paddingBottom: 36 },
+  heroSafe: { flex: 1, justifyContent: 'flex-end', padding: 24, paddingBottom: 28 },
   brand: {
-    fontSize: 44,
+    fontSize: 40,
     fontWeight: '900',
     color: colors.white,
     letterSpacing: -1,
   },
   tagline: {
     marginTop: 6,
-    fontSize: 17,
+    fontSize: 16,
     color: 'rgba(255,255,255,0.92)',
     fontWeight: '600',
   },
   sheet: {
     flex: 1,
-    marginTop: -28,
+    marginTop: -24,
     backgroundColor: colors.cream,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
-    paddingTop: 8,
+    paddingHorizontal: 24,
+    paddingTop: 22,
+    paddingBottom: 28,
   },
-  sheetInner: { padding: 24, paddingBottom: 40 },
   label: {
     fontSize: 20,
     fontWeight: '800',
@@ -127,16 +128,16 @@ const styles = StyleSheet.create({
     marginTop: 6,
     color: colors.muted,
     fontSize: 14,
-    marginBottom: 18,
+    marginBottom: 16,
   },
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 12,
-    marginBottom: 20,
+    marginBottom: 18,
   },
-  cell: { width: '22%' },
   age: {
+    width: '22%',
     aspectRatio: 1,
     borderRadius: 18,
     backgroundColor: colors.white,
@@ -148,7 +149,6 @@ const styles = StyleSheet.create({
   ageOn: {
     backgroundColor: colors.forest,
     borderColor: colors.forest,
-    transform: [{ scale: 1.04 }],
   },
   ageText: { fontSize: 22, fontWeight: '800', color: colors.forestDeep },
   ageTextOn: { color: colors.white },

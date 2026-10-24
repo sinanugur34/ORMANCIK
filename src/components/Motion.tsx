@@ -29,7 +29,8 @@ export function FadeInView({
   );
 }
 
-/** Web-safe pressable: native Pressable + animated wrapper (AnimatedPressable breaks clicks on RN Web). */
+/** Web-safe pressable: native Pressable + animated wrapper (AnimatedPressable breaks clicks on RN Web).
+ * Layout styles must live on the outer Animated.View so %-widths / flex work on web. */
 export function BouncePress({
   children,
   onPress,
@@ -45,7 +46,7 @@ export function BouncePress({
   const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   return (
-    <Animated.View style={anim}>
+    <Animated.View style={[style, anim]}>
       <Pressable
         accessibilityRole="button"
         disabled={disabled}
@@ -57,8 +58,14 @@ export function BouncePress({
         }}
         onPress={onPress}
         style={({ pressed }) => [
-          style,
-          { cursor: disabled ? 'default' : 'pointer', opacity: disabled ? 0.45 : pressed ? 0.9 : 1 } as ViewStyle,
+          {
+            width: '100%',
+            minHeight: '100%',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: disabled ? 'default' : 'pointer',
+            opacity: disabled ? 0.45 : pressed ? 0.9 : 1,
+          } as ViewStyle,
         ]}
       >
         {children}

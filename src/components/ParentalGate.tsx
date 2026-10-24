@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
   Modal,
   Pressable,
@@ -30,6 +30,13 @@ export function ParentalGate({
 
   const [value, setValue] = useState('');
   const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (visible) {
+      setValue('');
+      setError(false);
+    }
+  }, [visible, challenge.answer]);
 
   const submit = () => {
     if (Number(value) === challenge.answer) {

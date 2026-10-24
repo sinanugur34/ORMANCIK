@@ -6,4 +6,6 @@ export type RootStackParamList = {
   PlayRoom: undefined;
   Shop: undefined;
   Premium: undefined;
+  Settings: undefined;
+  Privacy: undefined;
 };

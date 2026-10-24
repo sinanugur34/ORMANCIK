@@ -6,7 +6,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { BouncePress, FadeInView } from '../components/Motion';
 import { ParentalGate } from '../components/ParentalGate';
 import { PrimaryButton } from '../components/PrimaryButton';
-import { purchasePremium } from '../monetization/mockIap';
+import { StatusBanner } from '../components/StatusBanner';
+import { MONETIZATION_COPY, USE_MOCK_MONETIZATION } from '../monetization/config';
+import { purchasePremium, restorePurchases } from '../monetization/mockIap';
 import { PRODUCTS } from '../monetization/products';
 import { RootStackParamList } from '../navigation/types';
 import { useGame } from '../store/GameContext';
@@ -19,25 +21,68 @@ const PERKS = [
   'Tüm kostüm, oda ve dostlar',
   `+${PRODUCTS.premium.bonusCoins} bonus jeton`,
   'Tek seferlik satın alma',
+  'Bölümler yine ücretsiz açılır',
 ];
+
+type GateKind = 'buy' | 'restore' | null;
 
 export function PremiumScreen({ navigation }: Props) {
   const { premium, setPremium, addCoins, ownCosmetic } = useGame();
-  const [gate, setGate] = useState(false);
+  const [gate, setGate] = useState<GateKind>(null);
   const [busy, setBusy] = useState(false);
+  const [banner, setBanner] = useState<{ message: string; tone: 'ok' | 'error' | 'info' | 'warn' } | null>(
+    null,
+  );
+
+  const unlockAllCosmetics = async () => {
+    const { COSMETICS } = await import('../data/cosmetics');
+    COSMETICS.forEach((c) => ownCosmetic(c.id));
+  };
 
   const buy = async () => {
     setBusy(true);
+    setBanner(null);
     try {
       const res = await purchasePremium();
       if (res.ok) {
         setPremium(true);
         if (res.coins) addCoins(res.coins);
-        // Unlock all cosmetics for premium owners in UI via premium flag;
-        // also mark owned for equipping persistence
-        const { COSMETICS } = await import('../data/cosmetics');
-        COSMETICS.forEach((c) => ownCosmetic(c.id));
+        await unlockAllCosmetics();
+        setBanner({
+          message: res.mock
+            ? `Premium aktif · ${MONETIZATION_COPY.mockIapNote}`
+            : 'Premium aktif!',
+          tone: 'ok',
+        });
+      } else {
+        setBanner({ message: res.reason, tone: 'error' });
       }
+    } catch {
+      setBanner({ message: 'Satın alma başarısız. Tekrar dene.', tone: 'error' });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const restore = async () => {
+    setBusy(true);
+    setBanner(null);
+    try {
+      const res = await restorePurchases();
+      if (res.premium) {
+        setPremium(true);
+        await unlockAllCosmetics();
+        setBanner({ message: 'Premium geri yüklendi.', tone: 'ok' });
+      } else {
+        setBanner({
+          message: USE_MOCK_MONETIZATION
+            ? 'Demo: geri yüklenecek satın alma yok.'
+            : 'Geri yüklenecek satın alma bulunamadı.',
+          tone: 'info',
+        });
+      }
+    } catch {
+      setBanner({ message: 'Geri yükleme başarısız.', tone: 'error' });
     } finally {
       setBusy(false);
     }
@@ -58,11 +103,19 @@ export function PremiumScreen({ navigation }: Props) {
           </View>
 
           <ScrollView contentContainerStyle={styles.body}>
+            {USE_MOCK_MONETIZATION ? (
+              <StatusBanner message={MONETIZATION_COPY.mockBadge} tone="warn" style={{ marginBottom: 14 }} />
+            ) : null}
+            {banner ? (
+              <StatusBanner message={banner.message} tone={banner.tone} style={{ marginBottom: 14 }} />
+            ) : null}
+
             <FadeInView>
               <Text style={styles.eyebrow}>Tiny Grove</Text>
               <Text style={styles.title}>Premium</Text>
               <Text style={styles.sub}>
-                Reklamsız, tüm kozmetikler açık — ebeveyn onaylı tek seferlik.
+                Reklamsız, tüm kozmetikler açık — ebeveyn onaylı tek seferlik. Bölümler parayla
+                kilitlenmez.
               </Text>
             </FadeInView>
 
@@ -83,22 +136,31 @@ export function PremiumScreen({ navigation }: Props) {
                   label={busy ? 'İşleniyor…' : 'Premium al'}
                   tone="sun"
                   disabled={busy}
-                  onPress={() => setGate(true)}
+                  onPress={() => setGate('buy')}
                   style={{ marginTop: 8 }}
                 />
               )}
+              <PrimaryButton
+                label={busy ? '…' : 'Satın almaları geri yükle'}
+                tone="sky"
+                disabled={busy}
+                onPress={() => setGate('restore')}
+                style={{ marginTop: 10 }}
+              />
             </FadeInView>
           </ScrollView>
         </SafeAreaView>
       </ImageBackground>
 
       <ParentalGate
-        visible={gate}
-        title="Premium satın alma"
-        onCancel={() => setGate(false)}
+        visible={!!gate}
+        title={gate === 'restore' ? 'Geri yükleme onayı' : 'Premium satın alma'}
+        onCancel={() => setGate(null)}
         onSuccess={() => {
-          setGate(false);
-          buy();
+          const kind = gate;
+          setGate(null);
+          if (kind === 'buy') buy();
+          else if (kind === 'restore') restore();
         }}
       />
     </View>
@@ -117,7 +179,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backText: { fontSize: 20, fontWeight: '800', color: colors.forestDeep },
-  body: { padding: 24, paddingTop: 40 },
+  body: { padding: 24, paddingTop: 24 },
   eyebrow: {
     color: colors.sun,
     fontWeight: '800',

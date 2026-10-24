@@ -7,15 +7,22 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "scheme": "tinygrove",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#1B7A4A"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.tinygrove.kids",
+      "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
       "package": "com.tinygrove.kids",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#1B7A4A",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -25,12 +32,16 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
+      "favicon": "./assets/favicon.png",
+      "name": "Tiny Grove",
+      "shortName": "TinyGrove"
     },
     "plugins": ["expo-font"],
     "extra": {
       "ageMin": 3,
-      "ageMax": 10
+      "ageMax": 10,
+      "privacyPolicyUrl": "https://tinygrove.app/privacy",
+      "supportEmail": "privacy@tinygrove.app"
     }
   }
 }

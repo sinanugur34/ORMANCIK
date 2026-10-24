@@ -66,17 +66,21 @@ export function PlayRoomScreen({ navigation }: Props) {
 
           <View style={styles.tray}>
             <Text style={styles.trayLabel}>Kostümler</Text>
-            <View style={styles.trayRow}>
-              {ownedOutfits.map((c) => (
-                <BouncePress
-                  key={c.id}
-                  onPress={() => equipCosmetic(c.id)}
-                  style={[styles.chip, equipped.outfit === c.id && styles.chipOn]}
-                >
-                  <Text style={styles.chipEmoji}>{c.emoji}</Text>
-                </BouncePress>
-              ))}
-            </View>
+            {ownedOutfits.length === 0 ? (
+              <Text style={styles.empty}>Henüz kostüm yok — dükkandan alabilirsin.</Text>
+            ) : (
+              <View style={styles.trayRow}>
+                {ownedOutfits.map((c) => (
+                  <BouncePress
+                    key={c.id}
+                    onPress={() => equipCosmetic(c.id)}
+                    style={[styles.chip, equipped.outfit === c.id && styles.chipOn]}
+                  >
+                    <Text style={styles.chipEmoji}>{c.emoji}</Text>
+                  </BouncePress>
+                ))}
+              </View>
+            )}
             <PrimaryButton
               label="Dükkana git"
               tone="coral"
@@ -127,6 +131,7 @@ const styles = StyleSheet.create({
     padding: 18,
   },
   trayLabel: { fontWeight: '800', color: colors.forestDeep, marginBottom: 10 },
+  empty: { color: colors.muted, fontWeight: '600', marginBottom: 4 },
   trayRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   chip: {
     width: 56,
