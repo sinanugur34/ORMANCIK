@@ -1,10 +1,12 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   ImageBackground,
+  ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
   useWindowDimensions,
 } from 'react-native';
@@ -14,10 +16,10 @@ import { BouncePress, FadeInView } from '../components/Motion';
 import { ParentalGate } from '../components/ParentalGate';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { RootStackParamList } from '../navigation/types';
-import { useGame } from '../store/GameContext';
+import { MAX_PROFILES, PROFILE_NAME_MAX, useGame } from '../store/GameContext';
 import { ageToBand, colors } from '../theme/colors';
 
-type Props = NativeStackScreenProps<RootStackParamList, 'AgeSetup'>;
+type Props = NativeStackScreenProps<RootStackParamList, 'ProfileSetup'>;
 
 const BANDS: { id: '3-5' | '6-8' | '9-10'; title: string; hint: string; ages: number[] }[] = [
   { id: '3-5', title: 'Küçük kaşif', hint: 'Büyük düğmeler · az seçenek', ages: [3, 4, 5] },
@@ -25,18 +27,36 @@ const BANDS: { id: '3-5' | '6-8' | '9-10'; title: string; hint: string; ages: nu
   { id: '9-10', title: 'Koru ustası', hint: 'Daha zor · zamanlı turlar', ages: [9, 10] },
 ];
 
-export function AgeSetupScreen({ navigation }: Props) {
-  const { setChildAge } = useGame();
+export function ProfileSetupScreen({ navigation, route }: Props) {
+  const { createProfile, profiles } = useGame();
+  const mode = route.params?.mode ?? (profiles.length === 0 ? 'first' : 'add');
+  const isAdd = mode === 'add';
+
+  const [name, setName] = useState('');
   const [age, setAge] = useState(5);
   const [gate, setGate] = useState(false);
-  const [introDone, setIntroDone] = useState(false);
+  const [introDone, setIntroDone] = useState(isAdd);
   const { height } = useWindowDimensions();
-  const heroH = Math.min(height * 0.34, 260);
+  const heroH = Math.min(height * 0.28, 220);
   const band = ageToBand(age);
 
+  const nameOk = name.trim().length > 0;
+  const canAdd = profiles.length < MAX_PROFILES;
+  const canSubmit = nameOk && (isAdd ? canAdd : true);
+
+  const title = useMemo(
+    () => (isAdd ? 'Yeni çocuk profili' : 'Çocuğunun profili'),
+    [isAdd],
+  );
+
   const confirm = () => {
-    setChildAge(age);
-    navigation.replace('Home');
+    const created = createProfile(name, age);
+    if (!created) return;
+    if (isAdd) {
+      navigation.goBack();
+    } else {
+      navigation.replace('Home');
+    }
   };
 
   if (!introDone) {
@@ -57,17 +77,43 @@ export function AgeSetupScreen({ navigation }: Props) {
         <SafeAreaView style={styles.heroSafe}>
           <FadeInView>
             <Text style={styles.brand}>Tiny Grove</Text>
-            <Text style={styles.tagline}>Yaşına göre yumuşak bir macera</Text>
+            <Text style={styles.tagline}>
+              {isAdd ? 'İkinci (veya yeni) kaşif ekle' : 'İsme ve yaşa göre yumuşak bir macera'}
+            </Text>
           </FadeInView>
         </SafeAreaView>
       </ImageBackground>
 
-      <View style={styles.sheet}>
+      <ScrollView
+        style={styles.sheet}
+        contentContainerStyle={styles.sheetContent}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
         <FadeInView delay={80}>
-          <Text style={styles.label}>Ebeveyn · çocuğun yaşı</Text>
-          <Text style={styles.hint}>Gruba göre büyük düğmeler ve zorluk ayarlanır.</Text>
+          <Text style={styles.label}>{title}</Text>
+          <Text style={styles.hint}>
+            İsim ve yaş, oyun zorluğunu ve karşılama metnini belirler.
+          </Text>
         </FadeInView>
 
+        <Text style={styles.fieldLabel}>İsim</Text>
+        <TextInput
+          value={name}
+          onChangeText={(t) => setName(t.slice(0, PROFILE_NAME_MAX))}
+          placeholder="Çocuğunun adı"
+          placeholderTextColor={colors.muted}
+          style={styles.nameInput}
+          maxLength={PROFILE_NAME_MAX}
+          autoCapitalize="words"
+          autoCorrect={false}
+          returnKeyType="done"
+        />
+        <Text style={styles.charCount}>
+          {name.trim().length}/{PROFILE_NAME_MAX}
+        </Text>
+
+        <Text style={[styles.fieldLabel, { marginTop: 8 }]}>Yaş</Text>
         <View style={styles.bandCol}>
           {BANDS.map((b) => {
             const active = band === b.id;
@@ -94,12 +140,32 @@ export function AgeSetupScreen({ navigation }: Props) {
           })}
         </View>
 
-        <PrimaryButton label="Başla" onPress={() => setGate(true)} style={{ marginTop: 8 }} />
-      </View>
+        {isAdd && !canAdd ? (
+          <Text style={styles.warn}>En fazla {MAX_PROFILES} çocuk profili eklenebilir.</Text>
+        ) : null}
+
+        <View style={styles.actions}>
+          {isAdd ? (
+            <PrimaryButton
+              label="Vazgeç"
+              tone="coral"
+              large={false}
+              onPress={() => navigation.goBack()}
+              style={{ flex: 1 }}
+            />
+          ) : null}
+          <PrimaryButton
+            label={isAdd ? 'Profili kaydet' : 'Başla'}
+            onPress={() => setGate(true)}
+            disabled={!canSubmit}
+            style={{ flex: 1, marginTop: isAdd ? 0 : 8 }}
+          />
+        </View>
+      </ScrollView>
 
       <ParentalGate
         visible={gate}
-        title="Yaşı kaydetmek için onay"
+        title={isAdd ? 'Yeni profil için ebeveyn onayı' : 'Profili kaydetmek için onay'}
         onCancel={() => setGate(false)}
         onSuccess={() => {
           setGate(false);
@@ -131,9 +197,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.cream,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
+  },
+  sheetContent: {
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: 28,
+    paddingBottom: 36,
   },
   label: {
     fontSize: 20,
@@ -145,6 +213,31 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 14,
     marginBottom: 14,
+  },
+  fieldLabel: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.forestDeep,
+    marginBottom: 8,
+  },
+  nameInput: {
+    minHeight: 64,
+    borderRadius: 20,
+    backgroundColor: colors.white,
+    borderWidth: 2,
+    borderColor: 'rgba(27,122,74,0.18)',
+    paddingHorizontal: 18,
+    fontSize: 22,
+    fontWeight: '800',
+    color: colors.forestDeep,
+  },
+  charCount: {
+    alignSelf: 'flex-end',
+    marginTop: 4,
+    marginBottom: 8,
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.muted,
   },
   bandCol: { gap: 12, marginBottom: 12 },
   bandCard: {
@@ -178,4 +271,11 @@ const styles = StyleSheet.create({
   },
   ageText: { fontSize: 22, fontWeight: '800', color: colors.forestDeep },
   ageTextOn: { color: colors.white },
+  warn: {
+    color: colors.coral,
+    fontWeight: '700',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  actions: { flexDirection: 'row', gap: 12, marginTop: 4, alignItems: 'stretch' },
 });

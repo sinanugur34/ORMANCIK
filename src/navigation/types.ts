@@ -1,5 +1,5 @@
 export type RootStackParamList = {
-  AgeSetup: undefined;
+  ProfileSetup: { mode?: 'first' | 'add' } | undefined;
   Home: undefined;
   Map: undefined;
   Level: { levelId: number };

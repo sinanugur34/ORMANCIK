@@ -1,7 +1,8 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { speakKidPrompt } from '../audio/speakPrompt';
 import { AnimatedBackground } from '../components/AnimatedBackground';
 import { CinematicHero } from '../components/CinematicHero';
 import { CoinBadge } from '../components/CoinBadge';
@@ -15,8 +16,20 @@ import { colors } from '../theme/colors';
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
 export function HomeScreen({ navigation }: Props) {
-  const { coins, premium, ageBand, childAge, clearedLevelIds, highestUnlocked } = useGame();
+  const {
+    coins,
+    premium,
+    ageBand,
+    childAge,
+    childName,
+    activeProfileId,
+    clearedLevelIds,
+    highestUnlocked,
+    voiceEnabled,
+  } = useGame();
   const soft = ageBand === '3-5';
+  const greetedId = useRef<string | null>(null);
+
   const nextLevel = (() => {
     for (let i = 1; i <= Math.min(highestUnlocked, TOTAL_LEVELS); i++) {
       if (!clearedLevelIds.includes(i)) return i;
@@ -24,15 +37,25 @@ export function HomeScreen({ navigation }: Props) {
     return Math.min(Math.max(highestUnlocked, 1), TOTAL_LEVELS);
   })();
 
+  useEffect(() => {
+    if (!activeProfileId || !childName || !voiceEnabled) return;
+    if (greetedId.current === activeProfileId) return;
+    greetedId.current = activeProfileId;
+    void speakKidPrompt(`Merhaba, ${childName}!`);
+  }, [activeProfileId, childName, voiceEnabled]);
+
   return (
     <AnimatedBackground variant="forest">
       <SafeAreaView style={styles.safe} edges={['top']}>
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 48 }}>
           <View style={styles.topBar}>
-            <View>
+            <View style={{ flex: 1, paddingRight: 8 }}>
               <Text style={styles.brand}>Tiny Grove</Text>
+              <Text style={styles.hello}>Merhaba, {childName ?? 'kaşif'}!</Text>
               <Text style={styles.meta}>
-                {soft ? `Yaş ${childAge}` : `Yaş ${childAge} · ${clearedLevelIds.length}/${TOTAL_LEVELS}`}
+                {soft
+                  ? `Yaş ${childAge}`
+                  : `Yaş ${childAge} · ${clearedLevelIds.length}/${TOTAL_LEVELS}`}
               </Text>
             </View>
             <View style={styles.topRight}>
@@ -135,9 +158,15 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   brand: { fontSize: 30, fontWeight: '900', color: colors.forestDeep, letterSpacing: -0.5 },
+  hello: {
+    marginTop: 4,
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.forest,
+  },
   meta: { color: colors.muted, fontWeight: '600', marginTop: 2, fontSize: 13 },
   topRight: { alignItems: 'flex-end', gap: 6 },
   settingsBtn: {
