@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { migrateCurriculum } from '../src/data/curriculum';
 import { buildFriendsLevel, buildReviewLevel } from '../src/data/friendsUnit';
 import { applyAttempt } from '../src/data/learning';
-import { buildRounds, orderByNeed } from '../src/data/rounds';
+import { buildRounds, orderByNeed, shapePixelSize } from '../src/data/rounds';
 
 const oldSave = migrateCurriculum({
   clearedLevelIds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
@@ -21,8 +21,18 @@ const played = migrateCurriculum({
   clearedLevelIds: [1, 2, 3],
   wordProgress: { hello: { id: 'hello' } },
 });
-assert.deepEqual(played.clearedLevelIds, [1, 2, 3]);
-assert.equal(played.friendsIntro, false);
+assert.deepEqual(played.clearedLevelIds, []);
+assert.equal(played.friendsIntro, true);
+
+const catOnly = migrateCurriculum({
+  clearedLevelIds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+  levelStars: { '1': 3, '8': 2, '12': 1 },
+  wordProgress: { cat: { id: 'cat' } },
+});
+assert.deepEqual(catOnly.clearedLevelIds, [9, 10, 11, 12]);
+assert.equal(catOnly.friendsIntro, true);
+assert.equal(catOnly.levelStars['1'], undefined);
+assert.equal(catOnly.levelStars['12'], 1);
 
 const again = migrateCurriculum({
   ...oldSave,
@@ -40,14 +50,23 @@ const ordered = orderByNeed(animals, 29, (animal) => animal.id === 'dog' || anim
 assert.ok(ordered.slice(0, 2).every((animal) => animal.id === 'dog' || animal.id === 'cat'));
 const rounds = buildRounds(animals, ordered.slice(0, 3), 29, (a, b) => a.id === b.id);
 assert.equal(rounds.length, 3);
-rounds.forEach((round, question) => {
-  assert.notEqual(round.targetIndex, question % round.options.length);
+rounds.forEach((round) => {
   assert.equal(round.options[round.targetIndex]?.id, round.target.id);
-  assert.notEqual(round.options[question]?.id, round.target.id);
 });
-const positionPath = rounds.map((round) => round.options[rounds.indexOf(round)]?.id);
-const targetPath = rounds.map((round) => round.target.id);
-assert.notDeepEqual(positionPath, targetPath);
+
+const pair = [{ id: 'left' }, { id: 'right' }];
+const firstSlots = new Set<number>();
+const patterns = new Set<string>();
+for (let seed = 0; seed < 30; seed++) {
+  const made = buildRounds(pair, [pair[0]!, pair[0]!], seed, (a, b) => a.id === b.id);
+  made.forEach((round) => {
+    assert.equal(round.options[round.targetIndex]?.id, 'left');
+  });
+  firstSlots.add(made[0]!.targetIndex);
+  patterns.add(made.map((round) => round.targetIndex).join(','));
+}
+assert.equal(firstSlots.size, 2, 'a two-choice answer must be able to sit in either slot');
+assert.ok(patterns.size > 1, 'two-choice questions must not share one fixed position pattern');
 
 const wrong = applyAttempt(undefined, { id: 'cat', independent: false, firstTry: false, correct: false }, 1_000);
 assert.equal(wrong.attempts, 1);
@@ -76,7 +95,42 @@ assert.ok(known?.lesson?.every((step) => step.wordId === 'rabbit'));
 const colors = buildReviewLevel(['teal', 'berry'], '3-5', 'en');
 assert.deepEqual(
   colors?.lesson?.map((step) => step.wordId),
-  ['teal', 'berry'],
+  ['color.teal', 'color.pink'],
+);
+for (const step of colors?.lesson ?? []) {
+  assert.ok(step.swatch);
+  assert.ok(step.choices.length >= 2);
+  assert.ok(step.choices.every((choice) => choice.swatch && choice.emoji !== '🫐' && choice.emoji !== '💠'));
+}
+assert.equal(colors?.lesson?.[0]?.hintTr, 'turkuaz');
+assert.equal(colors?.lesson?.[1]?.hintTr, 'pembe');
+
+const counted = applyAttempt(
+  undefined,
+  { id: 'count-5', skill: 'count-quantity', independent: true, firstTry: true, correct: true },
+  4_000,
+);
+const heard = applyAttempt(
+  undefined,
+  { id: 'five', skill: 'listen-recognize', independent: true, firstTry: true, correct: true },
+  5_000,
+);
+assert.equal(counted.skill, 'count-quantity');
+assert.equal(heard.skill, 'listen-recognize');
+assert.notEqual(counted.id, heard.id);
+
+const pixels = [0.62, 1.05, 1.55].map(shapePixelSize);
+assert.ok(pixels[1]! - pixels[0]! >= 12);
+assert.ok(pixels[2]! - pixels[1]! >= 12);
+
+const small = buildReviewLevel(['small'], '9-10', 'en');
+const scales = small?.lesson?.[0]?.choices.map((choice) => choice.scale) ?? [];
+assert.ok(new Set(scales).size >= 2);
+assert.ok(small?.lesson?.[0]?.choices.every((choice) => choice.id === 'big' || choice.id === 'small'));
+
+const five = buildReviewLevel(['five'], '9-10', 'en');
+assert.ok(
+  five?.lesson?.[0]?.choices.every((choice) => ['one', 'two', 'three', 'four', 'five'].includes(choice.id)),
 );
 
 console.log('learning review checks passed');

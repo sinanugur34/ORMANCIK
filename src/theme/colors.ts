@@ -1,3 +1,5 @@
+import { LEARNING_COLORS } from './colorNames';
+
 export const colors = {
   forestDeep: '#0F3D2E',
   forest: '#1B7A4A',
@@ -17,16 +19,8 @@ export const colors = {
   overlay: 'rgba(15,61,46,0.55)',
 };
 
-export const palette = [
-  '#FF6B6B',
-  '#FFC857',
-  '#4ECDC4',
-  '#6C5CE7',
-  '#3CB371',
-  '#FFAB76',
-  '#C44569',
-  '#54A0FF',
-] as const;
+/** Learning swatches use basic color names. Theme accents above stay as they are. */
+export const palette = LEARNING_COLORS.map((item) => item.hex);
 
 export type AgeBand = '3-5' | '6-8' | '9-10';
 

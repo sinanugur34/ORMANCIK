@@ -1,5 +1,6 @@
 import { tFor, type Language } from '../i18n';
 import type { AgeBand } from '../theme/colors';
+import { LEARNING_COLORS, LEGACY_COLOR_IDS } from '../theme/colorNames';
 import type { EnglishLevel } from './learning';
 import { islandForLevel } from './islands';
 import type { LevelDef } from './levels';
@@ -9,6 +10,10 @@ export type LessonChoice = {
   emoji: string;
   labelEn: string;
   labelTr: string;
+  /** Real color chip. Used instead of an emoji when set. */
+  swatch?: string;
+  /** Relative size of the same picture, so big and small stay the same kind. */
+  scale?: number;
 };
 
 export type LessonStep = {
@@ -20,6 +25,7 @@ export type LessonStep = {
   emoji: string;
   hintTr: string;
   choices: LessonChoice[];
+  swatch?: string;
 };
 
 export type CatalogWord = {
@@ -27,6 +33,8 @@ export type CatalogWord = {
   emoji: string;
   emojiAlt: string;
   en: string;
+  swatch?: string;
+  scale?: number;
   tr: string;
   model: string;
   modelClip: string;
@@ -114,22 +122,38 @@ const EXTRA: CatalogWord[] = [
   { id: 'unicorn', emoji: '🦄', emojiAlt: '🦄', en: 'unicorn', tr: 'tek boynuz', model: '', modelClip: '', find: 'Find the unicorn.', findClip: '', transfer: 'Touch the unicorn.', transferClip: '' },
 ];
 
+function colorCatalog(item: { hex: string; id: string; en: string; tr: string }): CatalogWord {
+  const name = item.en.charAt(0).toUpperCase() + item.en.slice(1);
+  return {
+    id: item.id,
+    emoji: '',
+    emojiAlt: '',
+    swatch: item.hex,
+    en: item.en,
+    tr: item.tr,
+    model: `${name}.`,
+    modelClip: '',
+    find: `Find the ${item.en}.`,
+    findClip: '',
+    transfer: `Touch the ${item.en}.`,
+    transferClip: '',
+  };
+}
+
+const COLOR_WORDS: CatalogWord[] = [
+  ...LEARNING_COLORS.map(colorCatalog),
+  colorCatalog({ hex: '#4ECDC4', id: 'color.teal', en: 'teal', tr: 'turkuaz' }),
+];
+
 const REVIEW_EXTRA: CatalogWord[] = [
-  { id: 'red', emoji: '🔴', emojiAlt: '🟥', en: 'red', tr: 'kırmızı', model: '', modelClip: '', find: 'Find the red.', findClip: '', transfer: 'Touch the red.', transferClip: '' },
-  { id: 'yellow', emoji: '🟡', emojiAlt: '🟨', en: 'yellow', tr: 'sarı', model: '', modelClip: '', find: 'Find the yellow.', findClip: '', transfer: 'Touch the yellow.', transferClip: '' },
-  { id: 'green', emoji: '🟢', emojiAlt: '🟩', en: 'green', tr: 'yeşil', model: '', modelClip: '', find: 'Find the green.', findClip: '', transfer: 'Touch the green.', transferClip: '' },
-  { id: 'blue', emoji: '🔵', emojiAlt: '🟦', en: 'blue', tr: 'mavi', model: '', modelClip: '', find: 'Find the blue.', findClip: '', transfer: 'Touch the blue.', transferClip: '' },
-  { id: 'purple', emoji: '🟣', emojiAlt: '🟪', en: 'purple', tr: 'mor', model: '', modelClip: '', find: 'Find the purple.', findClip: '', transfer: 'Touch the purple.', transferClip: '' },
-  { id: 'orange', emoji: '🟠', emojiAlt: '🟧', en: 'orange', tr: 'turuncu', model: '', modelClip: '', find: 'Find the orange.', findClip: '', transfer: 'Touch the orange.', transferClip: '' },
-  { id: 'teal', emoji: '🫧', emojiAlt: '💠', en: 'teal', tr: 'deniz mavisi', model: '', modelClip: '', find: 'Find the teal.', findClip: '', transfer: 'Touch the teal.', transferClip: '' },
-  { id: 'berry', emoji: '🍇', emojiAlt: '🫐', en: 'berry', tr: 'böğürtlen', model: '', modelClip: '', find: 'Find the berry.', findClip: '', transfer: 'Touch the berry.', transferClip: '' },
+  ...COLOR_WORDS,
   { id: 'one', emoji: '🍎', emojiAlt: '🌟', en: 'one', tr: 'bir', model: '', modelClip: '', find: 'Find one.', findClip: '', transfer: 'Touch one.', transferClip: '' },
   { id: 'two', emoji: '🍎🍎', emojiAlt: '🌟🌟', en: 'two', tr: 'iki', model: '', modelClip: '', find: 'Find two.', findClip: '', transfer: 'Touch two.', transferClip: '' },
   { id: 'three', emoji: '🍎🍎🍎', emojiAlt: '🌟🌟🌟', en: 'three', tr: 'üç', model: '', modelClip: '', find: 'Find three.', findClip: '', transfer: 'Touch three.', transferClip: '' },
   { id: 'four', emoji: '🍎🍎🍎🍎', emojiAlt: '🌟🌟🌟🌟', en: 'four', tr: 'dört', model: '', modelClip: '', find: 'Find four.', findClip: '', transfer: 'Touch four.', transferClip: '' },
   { id: 'five', emoji: '🍎🍎🍎🍎🍎', emojiAlt: '🌟🌟🌟🌟🌟', en: 'five', tr: 'beş', model: '', modelClip: '', find: 'Find five.', findClip: '', transfer: 'Touch five.', transferClip: '' },
-  { id: 'big', emoji: '🐘', emojiAlt: '🦒', en: 'big', tr: 'büyük', model: '', modelClip: '', find: 'Find the big one.', findClip: '', transfer: 'Touch the big one.', transferClip: '' },
-  { id: 'small', emoji: '🐭', emojiAlt: '🐜', en: 'small', tr: 'küçük', model: '', modelClip: '', find: 'Find the small one.', findClip: '', transfer: 'Touch the small one.', transferClip: '' },
+  { id: 'big', emoji: '●', emojiAlt: '●', scale: 1.65, en: 'big', tr: 'büyük', model: '', modelClip: '', find: 'Find the big one.', findClip: '', transfer: 'Touch the big one.', transferClip: '' },
+  { id: 'small', emoji: '●', emojiAlt: '●', scale: 0.62, en: 'small', tr: 'küçük', model: '', modelClip: '', find: 'Find the small one.', findClip: '', transfer: 'Touch the small one.', transferClip: '' },
   { id: 'circle', emoji: '●', emojiAlt: '⬤', en: 'circle', tr: 'daire', model: '', modelClip: '', find: 'Find the circle.', findClip: '', transfer: 'Touch the circle.', transferClip: '' },
   { id: 'square', emoji: '■', emojiAlt: '▢', en: 'square', tr: 'kare', model: '', modelClip: '', find: 'Find the square.', findClip: '', transfer: 'Touch the square.', transferClip: '' },
   { id: 'triangle', emoji: '▲', emojiAlt: '△', en: 'triangle', tr: 'üçgen', model: '', modelClip: '', find: 'Find the triangle.', findClip: '', transfer: 'Touch the triangle.', transferClip: '' },
@@ -146,8 +170,16 @@ export type AlbumWord = {
   en: string;
   tr: string;
   emoji: string;
+  swatch?: string;
   clipId?: string;
 };
+
+const NUMBER_IDS = new Set(['one', 'two', 'three', 'four', 'five']);
+const SHAPE_IDS = new Set(['circle', 'square', 'triangle', 'star', 'diamond', 'heart']);
+
+export function resolveReviewId(id: string): string {
+  return LEGACY_COLOR_IDS[id] ?? id;
+}
 
 export function listAlbumWords(): AlbumWord[] {
   const seen = new Set<string>();
@@ -167,15 +199,36 @@ export function listAlbumWords(): AlbumWord[] {
 }
 
 export function albumWord(id: string): AlbumWord | null {
-  const word = REVIEW_POOL.find((item) => item.id === id);
+  if (id.startsWith('count-')) {
+    const n = id.slice('count-'.length);
+    return { id, en: `how many · ${n}`, tr: `kaç tane · ${n}`, emoji: '🔢' };
+  }
+  const word = REVIEW_POOL.find((item) => item.id === resolveReviewId(id));
   if (!word) return null;
   return {
     id: word.id,
     en: word.en,
     tr: word.tr,
     emoji: word.emoji,
+    swatch: word.swatch,
     clipId: word.modelClip || undefined,
   };
+}
+
+function sameLook(a: CatalogWord, b: CatalogWord, kind: LessonStep['kind']): boolean {
+  if (a.swatch || b.swatch) return a.swatch === b.swatch;
+  if (a.scale != null || b.scale != null) return picture(a, kind) === picture(b, kind) && a.scale === b.scale;
+  return picture(a, kind) === picture(b, kind);
+}
+
+function reviewPoolFor(word: CatalogWord): CatalogWord[] {
+  if (word.id.startsWith('color.')) {
+    return COLOR_WORDS.filter((item) => item.id !== 'color.teal' || word.id === 'color.teal');
+  }
+  if (NUMBER_IDS.has(word.id)) return REVIEW_POOL.filter((item) => NUMBER_IDS.has(item.id));
+  if (word.id === 'big' || word.id === 'small') return REVIEW_POOL.filter((item) => item.id === 'big' || item.id === 'small');
+  if (SHAPE_IDS.has(word.id)) return REVIEW_POOL.filter((item) => SHAPE_IDS.has(item.id));
+  return POOL;
 }
 
 function mixSeed(seed: number): number {
@@ -202,7 +255,7 @@ function choicesFor(
   pool: CatalogWord[] = POOL,
 ): LessonChoice[] {
   const count = distractorCount(band, englishLevel);
-  const distractors = pool.filter((w) => w.id !== target.id && picture(w, kind) !== picture(target, kind));
+  const distractors = pool.filter((w) => w.id !== target.id && !sameLook(w, target, kind));
   const picked: CatalogWord[] = [];
   let state = salt;
   const copy = [...distractors];
@@ -225,6 +278,8 @@ function choicesFor(
     emoji: picture(w, kind),
     labelEn: w.en,
     labelTr: w.tr,
+    swatch: w.swatch,
+    scale: w.scale,
   }));
 }
 
@@ -245,6 +300,7 @@ function step(
     clipId,
     emoji: picture(word, kind),
     hintTr: word.tr,
+    swatch: word.swatch,
     choices: kind === 'model' ? [] : choicesFor(word, band, salt, kind, englishLevel, pool),
   };
 }
@@ -316,13 +372,13 @@ export function buildFriendsLevel(
 
 /** Short practice from the album. Uses the other picture for each word. */
 export function buildReviewLevel(wordIds: string[], band: AgeBand, lang: Language): LevelDef | null {
-  const unique = Array.from(new Set(wordIds)).slice(0, 4);
+  const unique = Array.from(new Set(wordIds.map(resolveReviewId))).slice(0, 4);
   const words = unique
     .map((id) => REVIEW_POOL.find((item) => item.id === id))
     .filter((item): item is CatalogWord => item != null);
   if (!words.length) return null;
   const lesson = words.map((word, index) =>
-    step(word, 'transfer', band, 40 + index, 'some', REVIEW_POOL),
+    step(word, 'transfer', band, 40 + index, 'some', reviewPoolFor(word)),
   );
   return {
     id: 0,

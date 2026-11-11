@@ -2,9 +2,12 @@
 
 export type EnglishLevel = 'new' | 'some' | 'ready';
 
+/** What an entry actually measured. Counting is not the same as hearing the English word. */
+export type LearningSkill = 'listen-recognize' | 'count-quantity';
+
 export type WordStat = {
   id: string;
-  skill: 'listen-recognize';
+  skill: LearningSkill;
   independent: number;
   hinted: number;
   firstTry: number;
@@ -23,6 +26,8 @@ export type WordAttempt = {
    * Independent and hinted count only correct entries.
    */
   correct: boolean;
+  /** Defaults to listen-recognize when an older caller omits it. */
+  skill?: LearningSkill;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -42,7 +47,7 @@ export function applyAttempt(prev: WordStat | undefined, attempt: WordAttempt, n
   return {
     ...base,
     id: attempt.id,
-    skill: 'listen-recognize',
+    skill: attempt.skill ?? base.skill,
     attempts: base.attempts + 1,
     independent: base.independent + (correct && attempt.independent ? 1 : 0),
     hinted: base.hinted + (correct && !attempt.independent ? 1 : 0),

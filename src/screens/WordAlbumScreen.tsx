@@ -22,7 +22,14 @@ export function WordAlbumScreen({ navigation }: Props) {
   const ids = Array.from(new Set([...catalog.map((word) => word.id), ...Object.keys(wordProgress)]));
   const dueIds = ids.filter((id) => {
     const stat = wordProgress[id];
-    return stat != null && isDue(stat);
+    const word = albumWord(id);
+    return (
+      stat != null &&
+      isDue(stat) &&
+      stat.skill !== 'count-quantity' &&
+      word != null &&
+      !word.id.startsWith('count-')
+    );
   });
 
   return (
@@ -48,11 +55,18 @@ export function WordAlbumScreen({ navigation }: Props) {
             const label = catalog.find((word) => word.id === id) ?? albumWord(id);
             const name = label ? (language === 'tr' ? `${label.en} · ${label.tr}` : label.en) : id;
             const due = stat != null && isDue(stat);
+            const counting = stat?.skill === 'count-quantity' || id.startsWith('count-');
             return (
               <View key={id} style={styles.card}>
-                <Text style={styles.word}>
-                  {label?.emoji ?? '★'} {name}
-                </Text>
+                <View style={styles.wordRow}>
+                  {label?.swatch ? (
+                    <View style={[styles.swatch, { backgroundColor: label.swatch }]} />
+                  ) : (
+                    <Text style={styles.emoji}>{label?.emoji || '★'}</Text>
+                  )}
+                  <Text style={styles.word}>{name}</Text>
+                </View>
+                {counting ? <Text style={styles.meta}>{t('album.skillCount')}</Text> : null}
                 {stat ? (
                   <Text style={styles.meta}>
                     {t('album.stats', {
@@ -66,16 +80,18 @@ export function WordAlbumScreen({ navigation }: Props) {
                   <Text style={styles.meta}>{t('album.empty')}</Text>
                 )}
                 <View style={styles.actions}>
-                  <BouncePress
-                    style={styles.action}
-                    onPress={() => {
-                      const spoken = label?.en ?? id;
-                      void speakKidPrompt(spoken, { lang: 'en', clipId: label?.clipId });
-                    }}
-                  >
-                    <Text style={styles.actionText}>{t('album.listen')}</Text>
-                  </BouncePress>
-                  {stat ? (
+                  {counting ? null : (
+                    <BouncePress
+                      style={styles.action}
+                      onPress={() => {
+                        const spoken = label?.en ?? id;
+                        void speakKidPrompt(spoken, { lang: 'en', clipId: label?.clipId });
+                      }}
+                    >
+                      <Text style={styles.actionText}>{t('album.listen')}</Text>
+                    </BouncePress>
+                  )}
+                  {stat && !counting ? (
                     <BouncePress
                       style={styles.action}
                       onPress={() => navigation.navigate('Review', { wordIds: [id] })}
@@ -108,7 +124,10 @@ const styles = StyleSheet.create({
   lead: { color: colors.muted, fontWeight: '600' },
   note: { color: colors.forest, fontWeight: '700', marginBottom: 8 },
   card: { backgroundColor: colors.card, borderRadius: 18, padding: 14 },
-  word: { fontSize: 18, fontWeight: '900', color: colors.forestDeep },
+  wordRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  emoji: { fontSize: 32, width: 48, textAlign: 'center' },
+  swatch: { width: 48, height: 48, borderRadius: 14 },
+  word: { fontSize: 18, fontWeight: '900', color: colors.forestDeep, flex: 1 },
   meta: { marginTop: 4, color: colors.forest, fontWeight: '700' },
   actions: { flexDirection: 'row', gap: 8, marginTop: 10 },
   action: {

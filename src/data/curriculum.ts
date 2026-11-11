@@ -2,8 +2,6 @@
 export const CURRICULUM_VERSION = 2;
 export const FRIENDS_LEVEL_COUNT = 8;
 
-const FRIEND_WORD_IDS = ['hello', 'bye', 'cat', 'dog', 'rabbit'];
-
 export type CurriculumInput = {
   clearedLevelIds?: number[];
   levelStars?: Record<string, 1 | 2 | 3>;
@@ -26,15 +24,11 @@ function friendClears(ids: number[]): number[] {
   return ids.filter((id) => id >= 1 && id <= FRIENDS_LEVEL_COUNT);
 }
 
-function playedNewFriendsUnit(wordProgress: Record<string, unknown> | undefined): boolean {
-  if (!wordProgress) return false;
-  return FRIEND_WORD_IDS.some((id) => wordProgress[id] != null);
-}
-
 /**
  * Old saves used levels 1–8 for other activities. Those clears must not count
- * as the new English unit. Coins and cosmetics are left to the caller.
- * A child who already has a friends-word record keeps those clears.
+ * as the new English unit. A word such as "cat" can come from the old animal
+ * game, so word records alone do not prove the new unit was finished.
+ * Coins, cosmetics, and word records are left to the caller.
  */
 export function migrateCurriculum(raw: CurriculumInput): CurriculumResult {
   const clearedLevelIds = Array.isArray(raw.clearedLevelIds) ? [...raw.clearedLevelIds] : [];
@@ -47,16 +41,6 @@ export function migrateCurriculum(raw: CurriculumInput): CurriculumResult {
       levelStars,
       contentVersion: raw.contentVersion ?? CURRICULUM_VERSION,
       friendsIntro: raw.friendsIntro ?? false,
-      legacyLevelIds,
-    };
-  }
-
-  if (playedNewFriendsUnit(raw.wordProgress)) {
-    return {
-      clearedLevelIds,
-      levelStars,
-      contentVersion: CURRICULUM_VERSION,
-      friendsIntro: false,
       legacyLevelIds,
     };
   }

@@ -31,13 +31,13 @@ export function orderByNeed<T>(pool: readonly T[], seed: number, isNeeded: (item
 export type Round<T> = {
   target: T;
   options: T[];
-  /** Index of the target inside options. Not the question index. */
+  /** Where the target landed in this question's own shuffle. */
   targetIndex: number;
 };
 
 /**
- * Each question gets its own option order. The target is moved off the
- * question index so tapping first, then second, then third cannot solve it.
+ * Target order and option order are chosen separately. Nothing about the
+ * question number forces the answer into a particular slot.
  */
 export function buildRounds<T>(
   pool: readonly T[],
@@ -50,19 +50,14 @@ export function buildRounds<T>(
     let options = seededShuffle(pool, seed + 19 + question * 97);
     let index = options.findIndex((item) => same(item, target));
     if (index < 0) {
-      options = [target, ...options.filter((item) => !same(item, target))];
-      index = 0;
-    }
-    const blocked = question % options.length;
-    if (index === blocked && options.length > 1) {
-      const swap = (index + 1) % options.length;
-      const next = [...options];
-      const current = next[index]!;
-      next[index] = next[swap]!;
-      next[swap] = current;
-      options = next;
-      index = swap;
+      options = seededShuffle([target, ...options.filter((item) => !same(item, target))], seed + 41 + question);
+      index = options.findIndex((item) => same(item, target));
     }
     return { target, options, targetIndex: index };
   });
+}
+
+/** Visible shape size. Touch targets stay larger than this when the shape is small. */
+export function shapePixelSize(scale: number): number {
+  return Math.round(52 * scale);
 }

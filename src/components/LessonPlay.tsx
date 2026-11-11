@@ -143,7 +143,11 @@ export function LessonPlay({ level, band, hintsEnabled, onWin }: Props) {
 
       {showPicture ? (
         <View style={styles.model}>
-          <Text style={styles.modelEmoji}>{step.emoji}</Text>
+          {step.swatch ? (
+            <View style={[styles.swatch, { backgroundColor: step.swatch }]} />
+          ) : (
+            <Text style={styles.modelEmoji}>{step.emoji}</Text>
+          )}
           {step.kind === 'model' ? <Text style={styles.modelWord}>{step.say}</Text> : null}
           {helpOn && hintsEnabled ? <Text style={styles.hint}>{step.hintTr}</Text> : null}
         </View>
@@ -163,7 +167,13 @@ export function LessonPlay({ level, band, hintsEnabled, onWin }: Props) {
               onPress={() => onChoose(choice.id)}
               style={[styles.choice, { width: size, height: size }]}
             >
-              <Text style={styles.choiceEmoji}>{choice.emoji}</Text>
+              {choice.swatch ? (
+                <View style={[styles.choiceSwatch, { backgroundColor: choice.swatch }]} />
+              ) : (
+                <Text style={[styles.choiceEmoji, { fontSize: Math.round((choice.scale ?? 1) * size * 0.42) }]}>
+                  {choice.emoji}
+                </Text>
+              )}
             </Pressable>
           ))}
         </View>
@@ -195,6 +205,8 @@ const styles = StyleSheet.create({
   good: { textAlign: 'center', marginTop: 10, color: colors.forest, fontWeight: '800' },
   model: { alignItems: 'center', marginTop: 16 },
   modelEmoji: { fontSize: 72 },
+  swatch: { width: 72, height: 72, borderRadius: 20 },
+  choiceSwatch: { width: '68%', height: '68%', borderRadius: 16 },
   modelWord: {
     marginTop: 6,
     fontSize: 18,
