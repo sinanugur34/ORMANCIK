@@ -1,5 +1,5 @@
 import type { AgeBand } from '../theme/colors';
-import { isDue, type WordStat } from './learning';
+import { heardIndependentCount, isDue, type WordStat } from './learning';
 import type { AnimalToken, LevelDef, ShapeToken } from './levels';
 import { buildRounds, orderByNeed, playSeed, seededShuffle, type Round } from './rounds';
 
@@ -43,7 +43,7 @@ export function animalRoundsFor(
   const ordered = orderByNeed(pool, playSeed(level.id, salt, 3), (animal) => {
     const id = animal.labelKey.replace(/^animal\./, '');
     const stat = wordProgress[id];
-    return !stat || isDue(stat) || stat.independent < 1;
+    return !stat || isDue(stat) || heardIndependentCount(stat) < 1;
   });
   return buildRounds(pool, ordered.slice(0, questions), playSeed(level.id, salt, 70), (a, b) => a.labelKey === b.labelKey);
 }

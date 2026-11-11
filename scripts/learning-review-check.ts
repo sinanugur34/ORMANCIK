@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { animalRoundsFor, colorRoundsFor, shapeRoundsFor } from '../src/data/activityRounds';
 import { acceptFriendsReplay, declineFriendsReplay, loadCurriculum, migrateCurriculum } from '../src/data/curriculum';
 import { albumWord, buildFriendsLevel, buildReviewLevel } from '../src/data/friendsUnit';
-import { applyAttempt, commitAttempts, familyStatus, localDayStamp, mergeWordProgress, practiceDay, skillAfterPrompt } from '../src/data/learning';
+import { appendLearningNotes, applyAttempt, commitAttempts, familyStatus, heardIndependentCount, knownWordIds, localDayStamp, mergeWordProgress, practiceDay, practiceResult, skillAfterPrompt } from '../src/data/learning';
 import { buildLevel } from '../src/data/levels';
 import { buildRounds, orderByNeed, shapePixelSize } from '../src/data/rounds';
 
@@ -317,6 +317,58 @@ const noon = Date.parse('2026-11-11T09:00:00Z');
 assert.equal(practiceDay(noon, noon, zone), 'today');
 assert.equal(practiceDay(noon - 24 * 60 * 60 * 1000, noon, zone), 'yesterday');
 assert.equal(practiceDay(noon - 10 * 24 * 60 * 60 * 1000, noon, zone), 'earlier');
+
+const clock = Date.now();
+const twice = (id: string, skill: 'picture-match' | 'listen-recognize') => {
+  const once = applyAttempt(
+    undefined,
+    { id, skill, independent: true, firstTry: true, correct: true },
+    clock,
+    { sessionId: 1 },
+  );
+  return applyAttempt(once, { id, skill, independent: true, firstTry: true, correct: true }, clock + 1000, { sessionId: 1 });
+};
+const silentPair = { cat: twice('cat', 'picture-match'), dog: twice('dog', 'picture-match') };
+assert.equal(heardIndependentCount(silentPair.cat), 0);
+assert.deepEqual(knownWordIds(silentPair, clock + 2000), []);
+const stillTaught = buildFriendsLevel(6, '6-8', 'en', {
+  englishLevel: 'ready',
+  knownIds: knownWordIds(silentPair, clock + 2000),
+});
+assert.ok(stillTaught?.lesson?.some((step) => step.wordId === 'cat'));
+assert.ok(stillTaught?.lesson?.some((step) => step.wordId === 'dog'));
+const heardPair = { cat: twice('cat', 'listen-recognize'), dog: twice('dog', 'listen-recognize') };
+const movedOn = buildFriendsLevel(6, '6-8', 'en', {
+  englishLevel: 'ready',
+  knownIds: knownWordIds(heardPair, clock + 2000),
+});
+assert.ok(movedOn?.lesson?.every((step) => step.wordId === 'rabbit'));
+const animalLevel = {
+  id: 20,
+  targetCount: 2,
+  optionCount: 2,
+  animals: [
+    { emoji: '🐱', labelKey: 'animal.cat' },
+    { emoji: '🐰', labelKey: 'animal.rabbit' },
+  ],
+} as Parameters<typeof animalRoundsFor>[0];
+const animalOrder = animalRoundsFor(animalLevel, '6-8', 4, {
+  cat: silentPair.cat,
+  rabbit: twice('rabbit', 'listen-recognize'),
+});
+assert.equal(animalOrder[0]?.target.labelKey, 'animal.cat');
+const lessonNotes = appendLearningNotes(
+  undefined,
+  [
+    { id: 'cat', correct: false, independent: false, firstTry: false, skill: 'picture-match' },
+    { id: 'cat', correct: true, independent: false, firstTry: false, skill: 'picture-match' },
+    { id: 'cat', correct: true, independent: true, firstTry: false, skill: 'picture-match' },
+  ],
+  clock,
+);
+assert.equal(new Set(lessonNotes.map((note) => note.eventId)).size, 3);
+assert.deepEqual(lessonNotes.map(practiceResult), ['tried', 'helped-seen', 'seen']);
+assert.equal(practiceResult({ correct: false, independent: false, skill: 'listen-recognize', eventId: 'a', id: 'cat', at: 1 }), 'tried');
 
 const withoutRoom = mergeWordProgress({
   'room.hat': {

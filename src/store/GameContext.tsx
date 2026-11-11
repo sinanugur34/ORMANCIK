@@ -247,7 +247,23 @@ function learningDefaults(raw?: Partial<ChildProfile>): Pick<
     replayOffer: raw?.replayOffer ?? false,
     homeTasks: Array.isArray(raw?.homeTasks) ? raw.homeTasks.filter((id) => typeof id === 'string') : [],
     recentLearning: Array.isArray(raw?.recentLearning)
-      ? raw.recentLearning.filter((note) => note && typeof note.id === 'string' && typeof note.at === 'number').slice(-40)
+      ? raw.recentLearning
+          .filter((note) => note && typeof note.id === 'string' && typeof note.at === 'number')
+          .slice(-40)
+          .map((note, index) => ({
+            eventId:
+              typeof note.eventId === 'string' && note.eventId
+                ? note.eventId
+                : `saved-${note.at}-${index}-${note.id}`,
+            id: note.id,
+            at: note.at,
+            correct: note.correct !== false,
+            independent: Boolean(note.independent),
+            skill:
+              note.skill === 'picture-match' || note.skill === 'count-quantity' || note.skill === 'listen-recognize'
+                ? note.skill
+                : 'listen-recognize',
+          }))
       : [],
   };
 }

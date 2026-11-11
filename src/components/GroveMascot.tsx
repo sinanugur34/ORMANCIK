@@ -51,7 +51,7 @@ export function GroveMascot({ size = 160, outfitEmoji, petEmoji, fxEmoji, hatEmo
   }));
 
   return (
-    <View style={{ width: size + 40, height: size + 40, alignItems: 'center', justifyContent: 'center' }}>
+    <View pointerEvents="none" style={{ width: size + 40, height: size + 40, alignItems: 'center', justifyContent: 'center' }}>
       {fxEmoji ? <Animated.Text style={[styles.fx, { fontSize: size * 0.22 }]}>{fxEmoji}</Animated.Text> : null}
       <Animated.View style={body}>
         <Image source={mascot} style={{ width: size, height: size, borderRadius: size * 0.28 }} />

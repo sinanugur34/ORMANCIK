@@ -1,6 +1,6 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ImageBackground, StyleSheet, Text, View } from 'react-native';
+import { ImageBackground, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { speakKidPrompt } from '../audio/speakPrompt';
@@ -84,14 +84,19 @@ export function PlayRoomScreen({ navigation }: Props) {
             </BouncePress>
           </View>
 
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+          >
           <FadeInView style={styles.stage}>
-            <View style={styles.scene}>
+            <View pointerEvents="none" style={styles.scene}>
               <View style={[styles.door, doorOpen && styles.doorOpen]}>
                 <View style={[styles.doorPanel, doorOpen && styles.doorPanelOpen]} />
                 <Text style={styles.doorMark}>{doorOpen ? '🌿' : ''}</Text>
               </View>
               <GroveMascot
-                size={150}
+                size={112}
                 outfitEmoji={outfit?.emoji}
                 petEmoji={pet?.emoji}
                 fxEmoji={fx?.emoji}
@@ -164,6 +169,7 @@ export function PlayRoomScreen({ navigation }: Props) {
               onPress={() => navigation.navigate('Shop')}
             />
           </View>
+          </ScrollView>
         </SafeAreaView>
       </ImageBackground>
     </View>
@@ -173,17 +179,17 @@ export function PlayRoomScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   scene: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 8 },
   door: {
-    width: 54,
-    height: 96,
+    width: 46,
+    height: 78,
     borderRadius: 12,
     backgroundColor: '#6B3E26',
-    marginBottom: 28,
+    marginBottom: 18,
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
   },
   doorOpen: { backgroundColor: '#F6E7C1' },
-  doorPanel: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 54, backgroundColor: '#8A5A3A' },
+  doorPanel: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 46, backgroundColor: '#8A5A3A' },
   doorPanelOpen: { width: 16 },
   doorMark: { fontSize: 22 },
   mat: {
@@ -210,12 +216,16 @@ const styles = StyleSheet.create({
   bg: { flex: 1 },
   safe: { flex: 1 },
   top: {
+    zIndex: 2,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
     paddingTop: 8,
+    paddingBottom: 4,
   },
+  scroll: { flex: 1 },
+  scrollContent: { paddingBottom: 24 },
   back: {
     width: 44,
     height: 44,
@@ -226,7 +236,7 @@ const styles = StyleSheet.create({
   },
   backText: { fontSize: 20, fontWeight: '800', color: colors.forestDeep },
   title: { color: colors.white, fontSize: 22, fontWeight: '900' },
-  stage: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  stage: { alignItems: 'center', justifyContent: 'center', paddingTop: 8 },
   caption: {
     marginTop: 8,
     color: colors.white,

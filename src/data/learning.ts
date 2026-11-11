@@ -35,12 +35,23 @@ export type WordStat = {
 };
 
 export type LearningNote = {
+  /** Stable id for one attempt. Word and time alone can repeat inside one lesson. */
+  eventId: string;
   id: string;
   at: number;
   correct: boolean;
   independent: boolean;
   skill: LearningSkill;
 };
+
+export type PracticeResult = 'tried' | 'seen' | 'helped-seen' | 'solo' | 'helped';
+
+/** Wrong answers stay wrong. Skill and help are read only after that. */
+export function practiceResult(note: Pick<LearningNote, 'correct' | 'independent' | 'skill'>): PracticeResult {
+  if (!note.correct) return 'tried';
+  if (note.skill === 'picture-match') return note.independent ? 'seen' : 'helped-seen';
+  return note.independent ? 'solo' : 'helped';
+}
 
 export type WordAttempt = {
   id: string;
@@ -191,6 +202,17 @@ export function heardIndependentCount(stat: WordStat): number {
   return heardSoFar(stat);
 }
 
+/** Listening lessons skip a word only after it was heard, not after a silent picture match. */
+export function knownWordIds(progress: Record<string, WordStat | undefined>, now = Date.now()): string[] {
+  return Object.values(progress)
+    .filter((stat): stat is WordStat => stat != null && heardIndependentCount(stat) >= 2 && !isDue(stat, now))
+    .map((stat) => stat.id);
+}
+
+export function pictureIndependentCount(stat: WordStat): number {
+  return Math.max(0, stat.independent - heardIndependentCount(stat));
+}
+
 /** What a family can honestly say. One sitting, or a silent match, is not "remembered later". */
 export function familyStatus(stat: WordStat): FamilyStatus {
   const heard = heardSoFar(stat);
@@ -283,6 +305,7 @@ export function appendLearningNotes(
     const skill: LearningSkill =
       attempt.skill === 'picture-match' || attempt.skill === 'count-quantity' ? attempt.skill : 'listen-recognize';
     next.push({
+      eventId: `${now.toString(36)}-${next.length.toString(36)}-${id}`,
       id,
       at: now,
       correct: attempt.correct !== false,

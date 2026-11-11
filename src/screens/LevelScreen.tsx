@@ -18,7 +18,7 @@ import { LevelPlay } from '../components/LevelPlay';
 import { BouncePress, FadeInView } from '../components/Motion';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SparkleBurst } from '../components/SparkleBurst';
-import { isDue } from '../data/learning';
+import { knownWordIds } from '../data/learning';
 import { displayIslandName, islandForLevel } from '../data/islands';
 import { buildLevel } from '../data/levels';
 import { useT } from '../i18n';
@@ -104,13 +104,7 @@ export function LevelScreen({ navigation, route }: Props) {
     dismissSitting,
   } = useGame();
   const band = ageBand ?? '3-5';
-  const knownIds = useMemo(
-    () =>
-      Object.values(wordProgress)
-        .filter((stat) => stat.independent >= 2 && !isDue(stat))
-        .map((stat) => stat.id),
-    [wordProgress],
-  );
+  const knownIds = useMemo(() => knownWordIds(wordProgress), [wordProgress]);
   const level = useMemo(
     () => buildLevel(levelId, band, language, { englishLevel, knownIds }),
     [levelId, band, language, englishLevel, knownIds],

@@ -7,7 +7,7 @@ import { AnimatedBackground } from '../components/AnimatedBackground';
 import { BouncePress } from '../components/Motion';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { albumWord, listAlbumWords } from '../data/friendsUnit';
-import { isDue, mergeWordProgress } from '../data/learning';
+import { heardIndependentCount, isDue, mergeWordProgress, pictureIndependentCount } from '../data/learning';
 import { useT } from '../i18n';
 import { RootStackParamList } from '../navigation/types';
 import { useGame } from '../store/GameContext';
@@ -88,7 +88,8 @@ export function WordAlbumScreen({ navigation }: Props) {
                 {stat ? (
                   <Text style={styles.meta}>
                     {t('album.stats', {
-                      independent: stat.independent,
+                      heard: heardIndependentCount(stat),
+                      seen: pictureIndependentCount(stat),
                       hinted: stat.hinted,
                       attempts: stat.attempts,
                     })}

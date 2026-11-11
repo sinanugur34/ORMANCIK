@@ -10,7 +10,7 @@ import { speakKidPrompt } from '../audio/speakPrompt';
 import { StatusBanner } from '../components/StatusBanner';
 import { HOME_TASKS } from '../data/homeTasks';
 import { albumWord } from '../data/friendsUnit';
-import { familyStatus, practiceDay, type LearningNote, type PracticeDay } from '../data/learning';
+import { familyStatus, practiceDay, practiceResult, type LearningNote, type PracticeDay } from '../data/learning';
 import type { Language } from '../i18n';
 import { useT } from '../i18n';
 import { isDeviceTurkish } from '../i18n/deviceLocale';
@@ -222,6 +222,7 @@ export function SettingsScreen({ navigation }: Props) {
     : Object.values(wordProgress)
         .filter((stat) => stat.attempts > 0 && stat.lastAt > 0 && stat.skill !== 'count-quantity' && !stat.id.startsWith('room.'))
         .map((stat) => ({
+          eventId: `legacy-${stat.id}-${stat.lastAt}`,
           id: stat.id,
           at: stat.lastAt,
           correct: stat.independent + stat.hinted > 0,
@@ -236,14 +237,18 @@ export function SettingsScreen({ navigation }: Props) {
       const name = wordName(note.id);
       if (!name) return [];
       const day = practiceDay(note.at);
-      const statusKey = note.skill === 'picture-match'
-        ? 'settings.statusSeen'
-        : note.independent
-          ? 'settings.statusSolo'
-          : note.correct
-            ? 'settings.statusHelped'
-            : 'settings.statusMet';
-      return [{ id: `${note.id}-${note.at}`, name, statusKey, day } as const];
+      const result = practiceResult(note);
+      const statusKey =
+        result === 'tried'
+          ? 'settings.statusTried'
+          : result === 'seen'
+            ? 'settings.statusSeen'
+            : result === 'helped-seen'
+              ? 'settings.statusHelpedSeen'
+              : result === 'solo'
+                ? 'settings.statusSolo'
+                : 'settings.statusHelped';
+      return [{ id: note.eventId, name, statusKey, day } as const];
     })
     .slice(0, 6);
 
