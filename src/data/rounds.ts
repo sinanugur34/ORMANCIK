@@ -1,9 +1,18 @@
 /** Question order and option placement are produced separately. */
 
+/** Mixes every bit. A nearby seed must not keep the same low bit. */
 export function mixSeed(seed: number): number {
-  let s = seed >>> 0;
-  s = (Math.imul(s, 1664525) + 1013904223) >>> 0;
-  return s;
+  let z = (seed + 0x9e3779b9) >>> 0;
+  z = Math.imul(z ^ (z >>> 16), 0x85ebca6b);
+  z = Math.imul(z ^ (z >>> 13), 0xc2b2ae35);
+  return (z ^ (z >>> 16)) >>> 0;
+}
+
+/** Level, replay, and job get separate streams. Adding a constant is not enough. */
+export function playSeed(levelId: number, salt: number, lane: number): number {
+  return mixSeed(
+    Math.imul(levelId + 1, 0x9e3779b9) ^ Math.imul((salt >>> 0) + 1, 0x85ebca6b) ^ Math.imul(lane + 1, 0xc2b2ae35),
+  );
 }
 
 export function seededShuffle<T>(items: readonly T[], seed: number): T[] {
@@ -20,10 +29,10 @@ export function seededShuffle<T>(items: readonly T[], seed: number): T[] {
 }
 
 export function orderByNeed<T>(pool: readonly T[], seed: number, isNeeded: (item: T) => boolean): T[] {
-  const needed = seededShuffle(pool.filter(isNeeded), seed + 1);
+  const needed = seededShuffle(pool.filter(isNeeded), mixSeed(seed ^ 0x51));
   const rest = seededShuffle(
     pool.filter((item) => !isNeeded(item)),
-    seed + 2,
+    mixSeed(seed ^ 0xae),
   );
   return [...needed, ...rest];
 }
@@ -47,10 +56,13 @@ export function buildRounds<T>(
 ): Round<T>[] {
   if (!pool.length || !targets.length) return [];
   return targets.map((target, question) => {
-    let options = seededShuffle(pool, seed + 19 + question * 97);
+    let options = seededShuffle(pool, mixSeed(Math.imul(seed ^ 0x6d2b79f5, question + 1) ^ 0x517cc1b7));
     let index = options.findIndex((item) => same(item, target));
     if (index < 0) {
-      options = seededShuffle([target, ...options.filter((item) => !same(item, target))], seed + 41 + question);
+      options = seededShuffle(
+        [target, ...options.filter((item) => !same(item, target))],
+        mixSeed(Math.imul(seed ^ 0x1b873593, question + 3)),
+      );
       index = options.findIndex((item) => same(item, target));
     }
     return { target, options, targetIndex: index };

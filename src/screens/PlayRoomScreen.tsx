@@ -1,5 +1,5 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ImageBackground, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,7 +25,7 @@ const ROOM_ART: Record<string, number> = {
 
 export function PlayRoomScreen({ navigation }: Props) {
   const t = useT();
-  const { equipped, ownedCosmeticIds, premium, equipCosmetic } = useGame();
+  const { equipped, ownedCosmeticIds, premium, equipCosmetic, recordLearning } = useGame();
 
   const outfit = COSMETICS.find((c) => c.id === equipped.outfit);
   const pet = COSMETICS.find((c) => c.id === equipped.pet);
@@ -33,6 +33,35 @@ export function PlayRoomScreen({ navigation }: Props) {
   const roomArt = ROOM_ART[equipped.room] ?? ROOM_ART['room-meadow'];
   const treehouse = equipped.room === 'room-treehouse';
   const [hatOn, setHatOn] = useState(false);
+  const [rabbitOn, setRabbitOn] = useState(false);
+  const [doorOpen, setDoorOpen] = useState(false);
+  const roomDone = useRef(new Set<string>());
+  const roomMissed = useRef(new Set<string>());
+
+  const finishRoomTask = (id: string, right: boolean) => {
+    if (roomDone.current.has(id)) return;
+    if (!right) {
+      if (!roomMissed.current.has(id)) {
+        roomMissed.current.add(id);
+        recordLearning([
+          { id, correct: false, independent: false, firstTry: false, skill: 'listen-recognize', variant: 'listen' },
+        ]);
+      }
+      return;
+    }
+    roomDone.current.add(id);
+    const helped = roomMissed.current.has(id);
+    recordLearning([
+      {
+        id,
+        correct: true,
+        independent: !helped,
+        firstTry: !helped,
+        skill: 'listen-recognize',
+        variant: 'listen',
+      },
+    ]);
+  };
 
   useEffect(() => {
     void speakKidPrompt('Put on the hat.', { lang: 'en', clipId: 'room-hat' });
@@ -75,8 +104,51 @@ export function PlayRoomScreen({ navigation }: Props) {
               petEmoji={pet?.emoji}
               fxEmoji={fx?.emoji}
             />
-            <Text style={styles.caption}>{hatOn ? t('playRoom.taskDone') : t('playRoom.task')}</Text>
-            <ListenBar text="Put on the hat." clipId="room-hat" lang="en" />
+            <Text style={styles.caption}>
+              {doorOpen ? t('playRoom.taskDone') : rabbitOn ? t('playRoom.taskDoor') : hatOn ? t('playRoom.taskRabbit') : t('playRoom.task')}
+            </Text>
+            <ListenBar
+              text={hatOn ? (rabbitOn ? 'Open the door.' : 'Put the rabbit on the mat.') : 'Put on the hat.'}
+              clipId={hatOn ? undefined : 'room-hat'}
+              lang="en"
+            />
+            <View style={styles.taskRow}>
+              <BouncePress
+                onPress={() => {
+                  setHatOn(true);
+                  finishRoomTask('room.hat', true);
+                }}
+                style={styles.taskBtn}
+              >
+                <Text style={styles.chipEmoji}>🎩</Text>
+              </BouncePress>
+              <BouncePress
+                onPress={() => {
+                  if (!hatOn) {
+                    finishRoomTask('room.hat', false);
+                    return;
+                  }
+                  setRabbitOn(true);
+                  finishRoomTask('room.rabbit', true);
+                }}
+                style={styles.taskBtn}
+              >
+                <Text style={styles.chipEmoji}>🐰</Text>
+              </BouncePress>
+              <BouncePress
+                onPress={() => {
+                  if (!rabbitOn) {
+                    finishRoomTask(hatOn ? 'room.rabbit' : 'room.hat', false);
+                    return;
+                  }
+                  setDoorOpen(true);
+                  finishRoomTask('room.door', true);
+                }}
+                style={styles.taskBtn}
+              >
+                <Text style={styles.chipEmoji}>🚪</Text>
+              </BouncePress>
+            </View>
           </FadeInView>
 
           <View style={styles.tray}>
@@ -88,10 +160,7 @@ export function PlayRoomScreen({ navigation }: Props) {
                 {ownedOutfits.map((c) => (
                   <BouncePress
                     key={c.id}
-                    onPress={() => {
-                      equipCosmetic(c.id);
-                      setHatOn(c.id === 'outfit-leaf');
-                    }}
+                    onPress={() => equipCosmetic(c.id)}
                     style={[styles.chip, equipped.outfit === c.id && styles.chipOn]}
                   >
                     <Text style={styles.chipEmoji}>{c.emoji}</Text>
@@ -113,6 +182,15 @@ export function PlayRoomScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  taskRow: { flexDirection: 'row', justifyContent: 'center', gap: 12, marginTop: 12 },
+  taskBtn: {
+    width: 72,
+    height: 72,
+    borderRadius: 20,
+    backgroundColor: colors.cream,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   root: { flex: 1, backgroundColor: colors.forestDeep },
   bg: { flex: 1 },
   safe: { flex: 1 },

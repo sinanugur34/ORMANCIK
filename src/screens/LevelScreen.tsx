@@ -150,6 +150,7 @@ export function LevelScreen({ navigation, route }: Props) {
               <Text style={styles.modalSub}>
                 {t('level.rewardSub', { island: islandLabel, reward: awarded })}
               </Text>
+              {levelId === 8 ? <Text style={styles.modalSub}>{t('level.friendsTogether')}</Text> : null}
               <StarRow stars={stars} />
             </LinearGradient>
             <View style={styles.modalActions}>

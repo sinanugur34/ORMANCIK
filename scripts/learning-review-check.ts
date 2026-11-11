@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
-import { migrateCurriculum } from '../src/data/curriculum';
+import { animalRoundsFor, colorRoundsFor, shapeRoundsFor } from '../src/data/activityRounds';
+import { acceptFriendsReplay, declineFriendsReplay, migrateCurriculum } from '../src/data/curriculum';
 import { albumWord, buildFriendsLevel, buildReviewLevel } from '../src/data/friendsUnit';
-import { applyAttempt, mergeWordProgress } from '../src/data/learning';
+import { applyAttempt, commitAttempts, familyStatus, mergeWordProgress } from '../src/data/learning';
+import { buildLevel } from '../src/data/levels';
 import { buildRounds, orderByNeed, shapePixelSize } from '../src/data/rounds';
 
 const oldSave = migrateCurriculum({
@@ -15,7 +17,8 @@ assert.equal(oldSave.friendsIntro, true);
 assert.deepEqual(oldSave.legacyLevelIds, [1, 2, 3, 4, 5, 6, 7, 8]);
 assert.equal(oldSave.levelStars['1'], undefined);
 assert.equal(oldSave.levelStars['12'], 2);
-assert.equal(oldSave.contentVersion, 2);
+assert.equal(oldSave.contentVersion, 3);
+assert.equal(oldSave.replayOffer, false);
 
 const played = migrateCurriculum({
   clearedLevelIds: [1, 2, 3],
@@ -190,5 +193,114 @@ assert.equal(merged['color.red']?.independent, 3);
 assert.equal(merged['color.red']?.reviewAt, 5);
 assert.equal(merged['color.pink']?.attempts, 1);
 assert.equal(merged.cat?.independent, 3);
+
+const badVersion = migrateCurriculum({
+  contentVersion: 2,
+  clearedLevelIds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+  friendsIntro: false,
+  legacyLevelIds: [],
+  wordProgress: { cat: { id: 'cat' } },
+});
+assert.equal(badVersion.replayOffer, true);
+assert.ok(badVersion.clearedLevelIds.includes(1));
+assert.ok(badVersion.clearedLevelIds.includes(13) === false);
+assert.ok(badVersion.clearedLevelIds.includes(12));
+const replayed = acceptFriendsReplay(badVersion);
+assert.ok(!replayed.clearedLevelIds.includes(1));
+assert.ok(replayed.clearedLevelIds.includes(12));
+assert.equal(replayed.friendsIntro, true);
+assert.equal(replayed.replayOffer, false);
+assert.ok(replayed.legacyLevelIds.includes(1));
+const declined = declineFriendsReplay(badVersion);
+assert.ok(declined.clearedLevelIds.includes(1));
+assert.equal(declined.replayOffer, false);
+const settled = migrateCurriculum({ ...declined, clearedLevelIds: [1, 12] });
+assert.equal(settled.replayOffer, false);
+assert.ok(settled.clearedLevelIds.includes(1));
+
+const repaired = migrateCurriculum({
+  contentVersion: 2,
+  clearedLevelIds: [9, 10],
+  friendsIntro: true,
+  legacyLevelIds: [1, 2, 3, 4, 5, 6, 7, 8],
+});
+assert.equal(repaired.replayOffer, false);
+assert.deepEqual(repaired.clearedLevelIds, [9, 10]);
+
+function slotSpread(
+  indexes: number[],
+  label: string,
+): void {
+  if (indexes.length < 4) return;
+  const slots = new Set(indexes);
+  assert.equal(slots.size, 2, `${label} answers must be able to sit in either slot`);
+  const zeros = indexes.filter((index) => index === 0).length;
+  assert.ok(zeros !== indexes.length && zeros !== 0, `${label} must not keep one fixed slot`);
+  const pattern = indexes.slice(0, 8).map(String).join('');
+  assert.notEqual(pattern, '01010101');
+  assert.notEqual(pattern, '10101010');
+}
+
+for (const band of ['3-5', '6-8', '9-10'] as const) {
+  const animals: number[] = [];
+  const colors: number[] = [];
+  const shapes: number[] = [];
+  for (let id = 9; id <= 80; id++) {
+    const level = buildLevel(id, band, 'en');
+    const animal = animalRoundsFor(level, band, 0, {})[0];
+    const color = colorRoundsFor(level, band, 0)[0];
+    const shape = shapeRoundsFor(level, band, 0)[0];
+    if (level.template === 'animalMatch' && animal && animal.options.length === 2) animals.push(animal.targetIndex);
+    if (level.template === 'colorMatch' && color && color.options.length === 2) colors.push(color.targetIndex);
+    if (level.template === 'shapeSort' && shape && shape.options.length === 2) shapes.push(shape.targetIndex);
+  }
+  slotSpread(animals, `${band} animals`);
+  slotSpread(colors, `${band} colors`);
+  slotSpread(shapes, `${band} shapes`);
+}
+
+const dueCat = {
+  cat: {
+    id: 'cat',
+    skill: 'listen-recognize' as const,
+    independent: 0,
+    hinted: 1,
+    firstTry: 0,
+    attempts: 2,
+    lastAt: 1,
+    reviewAt: 1,
+  },
+};
+const sample = buildLevel(11, '3-5', 'en');
+const salted = new Set<number>();
+for (let salt = 0; salt < 20; salt++) {
+  const round = animalRoundsFor(sample, '3-5', salt, dueCat)[0];
+  if (round && round.options.length >= 2) salted.add(round.targetIndex);
+}
+assert.ok(salted.size >= 2, 'a new try of the same level must be able to move the answer');
+
+const berryStat = {
+  berry: {
+    id: 'berry',
+    skill: 'listen-recognize' as const,
+    independent: 0,
+    hinted: 1,
+    firstTry: 0,
+    attempts: 2,
+    lastAt: 4_000,
+    reviewAt: 1,
+  },
+};
+const afterPink = commitAttempts(
+  berryStat,
+  [{ id: 'color.pink', correct: true, independent: true, firstTry: true }],
+  50_000,
+);
+assert.equal(afterPink.berry, undefined);
+assert.equal(afterPink['color.pink']?.attempts, 3);
+assert.ok((afterPink['color.pink']?.reviewAt ?? 0) > 50_000);
+const againPink = mergeWordProgress(afterPink);
+assert.equal(againPink['color.pink']?.attempts, 3);
+assert.equal(familyStatus(afterPink['color.pink']!), 'solo');
 
 console.log('learning review checks passed');

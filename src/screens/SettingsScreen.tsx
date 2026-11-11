@@ -6,7 +6,11 @@ import { AnimatedBackground } from '../components/AnimatedBackground';
 import { BouncePress, FadeInView } from '../components/Motion';
 import { ParentalGate } from '../components/ParentalGate';
 import { PrimaryButton } from '../components/PrimaryButton';
+import { speakKidPrompt } from '../audio/speakPrompt';
 import { StatusBanner } from '../components/StatusBanner';
+import { HOME_TASKS } from '../data/homeTasks';
+import { albumWord } from '../data/friendsUnit';
+import { familyStatus } from '../data/learning';
 import type { Language } from '../i18n';
 import { useT } from '../i18n';
 import { isDeviceTurkish } from '../i18n/deviceLocale';
@@ -26,6 +30,9 @@ type GateKind =
   | { type: 'reset' }
   | { type: 'add' }
   | { type: 'delete'; id: string }
+  | { type: 'replay' }
+  | { type: 'keepReplay' }
+  | { type: 'homeTask'; id: string }
   | null;
 
 export function SettingsScreen({ navigation }: Props) {
@@ -53,6 +60,12 @@ export function SettingsScreen({ navigation }: Props) {
     sessionLimit,
     setSessionLimit,
     saveIssue,
+    wordProgress,
+    replayOffer,
+    acceptReplay,
+    declineReplay,
+    homeTasks,
+    markHomeTask,
   } = useGame();
   const [ageDraft, setAgeDraft] = useState(childAge ?? 5);
   const [gate, setGate] = useState<GateKind>(null);
@@ -89,6 +102,23 @@ export function SettingsScreen({ navigation }: Props) {
         message: ok ? t('settings.deleted') : t('settings.deleteFail'),
         tone: ok ? 'ok' : 'error',
       });
+      return;
+    }
+
+    if (kind.type === 'replay') {
+      acceptReplay();
+      setBanner({ message: t('settings.replayYes'), tone: 'ok' });
+      return;
+    }
+
+    if (kind.type === 'keepReplay') {
+      declineReplay();
+      setBanner({ message: t('settings.replayNo'), tone: 'info' });
+      return;
+    }
+
+    if (kind.type === 'homeTask') {
+      markHomeTask(kind.id);
       return;
     }
 
@@ -162,6 +192,25 @@ export function SettingsScreen({ navigation }: Props) {
     if (lang === language) return;
     setLanguage(lang);
   };
+
+  const familyRows = Object.values(wordProgress)
+    .filter((stat) => stat.attempts > 0 && stat.skill !== 'count-quantity')
+    .sort((a, b) => b.lastAt - a.lastAt)
+    .slice(0, 6)
+    .map((stat) => {
+      const word = albumWord(stat.id);
+      const status = familyStatus(stat);
+      const statusKey =
+        status === 'recalled'
+          ? 'settings.statusRecalled'
+          : status === 'solo'
+            ? 'settings.statusSolo'
+            : status === 'helped'
+              ? 'settings.statusHelped'
+              : 'settings.statusMet';
+      const name = word ? (language === 'tr' ? `${word.en} · ${word.tr}` : word.en) : stat.id;
+      return { id: stat.id, name, statusKey } as const;
+    });
 
   return (
     <AnimatedBackground variant="forest">
@@ -296,9 +345,64 @@ export function SettingsScreen({ navigation }: Props) {
             />
           </FadeInView>
 
+          <FadeInView delay={70} style={styles.card}>
+            <Text style={styles.h}>{t('settings.familyTitle')}</Text>
+            {familyRows.length === 0 ? <Text style={styles.sub}>{t('settings.familyEmpty')}</Text> : null}
+            {familyRows.map((row) => (
+              <Text key={row.id} style={styles.sub}>
+                {row.name} · {t(row.statusKey)}
+              </Text>
+            ))}
+            {replayOffer ? (
+              <View style={{ marginTop: 12 }}>
+                <Text style={styles.h}>{t('settings.replayTitle')}</Text>
+                <Text style={styles.sub}>{t('settings.replayBody')}</Text>
+                <PrimaryButton
+                  label={t('settings.replayYes')}
+                  onPress={() => setGate({ type: 'replay' })}
+                  style={{ marginTop: 8 }}
+                />
+                <PrimaryButton
+                  label={t('settings.replayNo')}
+                  tone="sky"
+                  large={false}
+                  onPress={() => setGate({ type: 'keepReplay' })}
+                  style={{ marginTop: 8 }}
+                />
+              </View>
+            ) : null}
+            <Text style={[styles.h, { marginTop: 16 }]}>{t('homeTask.title')}</Text>
+            <Text style={styles.sub}>{t('homeTask.body')}</Text>
+            {HOME_TASKS.map((task) => {
+              const done = homeTasks.includes(task.id);
+              return (
+                <View key={task.id} style={{ marginTop: 10 }}>
+                  <Text style={styles.sub}>{t(task.label)}</Text>
+                  <View style={styles.langRow}>
+                    <PrimaryButton
+                      label={t('album.listen')}
+                      large={false}
+                      tone="sky"
+                      onPress={() => {
+                        void speakKidPrompt(task.say, { lang: 'en', clipId: task.clipId });
+                      }}
+                    />
+                    <PrimaryButton
+                      label={done ? t('homeTask.done') : t('homeTask.mark')}
+                      large={false}
+                      disabled={done}
+                      onPress={() => setGate({ type: 'homeTask', id: task.id })}
+                    />
+                  </View>
+                </View>
+              );
+            })}
+          </FadeInView>
+
           <FadeInView delay={80} style={styles.card}>
             <Text style={styles.h}>{t('settings.voice')}</Text>
             <Text style={styles.sub}>{t('settings.voiceSub')}</Text>
+            <Text style={styles.sub}>{t('settings.voicePack')}</Text>
             <BouncePress
               onPress={() => setVoiceEnabled(!voiceEnabled)}
               style={[styles.toggleRow, voiceEnabled ? styles.toggleOn : styles.toggleOff]}

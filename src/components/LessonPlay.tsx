@@ -121,6 +121,7 @@ export function LessonPlay({ level, band, hintsEnabled, onWin }: Props) {
         correct: true,
         independent: !helpUsed.current,
         firstTry: !missed.current && !helpUsed.current,
+        variant: step.kind === 'transfer' ? 'transfer' : 'find',
       });
       later(() => advance(), 450);
       return;

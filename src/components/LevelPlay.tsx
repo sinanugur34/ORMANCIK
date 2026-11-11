@@ -9,9 +9,10 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { speakKidPrompt, speakPraise, stopSpeaking } from '../audio/speakPrompt';
-import { buildRounds, orderByNeed, seededShuffle, shapePixelSize } from '../data/rounds';
+import { animalRoundsFor, colorRoundsFor, shapeRoundsFor } from '../data/activityRounds';
+import { buildRounds, playSeed, seededShuffle, shapePixelSize } from '../data/rounds';
 import { tFor, useT } from '../i18n';
-import { isDue, type LearningSkill, type WordAttempt, type WordStat } from '../data/learning';
+import { type LearningSkill, type WordAttempt, type WordStat } from '../data/learning';
 import { LevelDef, starsFromMistakes } from '../data/levels';
 import { AgeBand, colors } from '../theme/colors';
 import { colorId, colorName } from '../theme/colorNames';
@@ -77,6 +78,7 @@ function ArcadeLevel({ level, band, hintsEnabled, wordProgress = EMPTY_PROGRESS,
   const [animalHelp, setAnimalHelp] = useState(false);
   const [roundHelp, setRoundHelp] = useState(false);
   const [countPhase, setCountPhase] = useState<'quantity' | 'model' | 'listen'>('quantity');
+  const [playSalt] = useState(() => Math.floor(Math.random() * 0x7fffffff));
   const pop = useSharedValue(1);
   const size = btnSize(band);
   const settled = useRef(false);
@@ -153,30 +155,20 @@ function ArcadeLevel({ level, band, hintsEnabled, wordProgress = EMPTY_PROGRESS,
   const need = Math.max(1, Math.min(level.targetCount, band === '3-5' ? 2 : 4));
   const optionN = band === '3-5' ? Math.min(level.optionCount, 3) : level.optionCount;
 
-  const colorRounds = useMemo(() => {
-    const pool = level.colors.slice(0, Math.max(2, optionN));
-    if (!pool.length) return [];
-    const targets = seededShuffle(pool, level.id + 11).slice(0, Math.max(1, Math.min(need, pool.length)));
-    return buildRounds(pool, targets, level.id + 23, (a, b) => a === b);
-  }, [level.id, level.colors, optionN, need]);
+  const colorRounds = useMemo(() => colorRoundsFor(level, band, playSalt), [level, band, playSalt]);
 
-  const shapeRounds = useMemo(() => {
-    const pool = level.shapeTokens.slice(0, Math.max(2, optionN));
-    if (!pool.length) return [];
-    const targets = seededShuffle(pool, level.id + 29).slice(0, Math.max(1, Math.min(need, pool.length)));
-    return buildRounds(pool, targets, level.id + 41, (a, b) => a.glyph === b.glyph);
-  }, [level.id, level.shapeTokens, optionN, need]);
+  const shapeRounds = useMemo(() => shapeRoundsFor(level, band, playSalt), [level, band, playSalt]);
 
   const countRounds = useMemo(() => {
     const counts = [1, 2, 3, 4, 5];
     const questions = Math.max(1, Math.min(need, 3));
-    const targets = seededShuffle(counts, level.id + 31).slice(0, questions);
+    const targets = seededShuffle(counts, playSeed(level.id, playSalt, 31)).slice(0, questions);
     return targets.map((count, question) => {
       const near = seededShuffle(
         counts.filter((n) => n !== count),
-        level.id + question,
+        playSeed(level.id, playSalt, 80 + question),
       ).slice(0, 2);
-      const choices = buildRounds([count, ...near], [count], level.id + 80 + question, (a, b) => a === b)[0]
+      const choices = buildRounds([count, ...near], [count], playSeed(level.id, playSalt, 90 + question), (a, b) => a === b)[0]
         ?.options ?? [count, ...near];
       return {
         count,
@@ -184,7 +176,7 @@ function ArcadeLevel({ level, band, hintsEnabled, wordProgress = EMPTY_PROGRESS,
         choices,
       };
     });
-  }, [level.id, need]);
+  }, [level.id, need, playSalt]);
 
   const colorRound = colorRounds[Math.min(progress, Math.max(colorRounds.length - 1, 0))];
   const shapeRound = shapeRounds[Math.min(progress, Math.max(shapeRounds.length - 1, 0))];
@@ -196,13 +188,13 @@ function ArcadeLevel({ level, band, hintsEnabled, wordProgress = EMPTY_PROGRESS,
     const counts = [1, 2, 3, 4, 5];
     const near = seededShuffle(
       counts.filter((n) => n !== countRound.count),
-      level.id + progress + 3,
+      playSeed(level.id, playSalt, 120 + progress),
     ).slice(0, 2);
     return (
-      buildRounds([countRound.count, ...near], [countRound.count], level.id + 120 + progress, (a, b) => a === b)[0]
+      buildRounds([countRound.count, ...near], [countRound.count], playSeed(level.id, playSalt, 140 + progress), (a, b) => a === b)[0]
         ?.options ?? [countRound.count, ...near]
     );
-  }, [countRound, level.id, progress]);
+  }, [countRound, level.id, playSalt, progress]);
   const targetColor = colorRound?.target ?? level.colors[0];
   const targetToken = shapeRound?.target ?? level.shapeTokens[0];
   const targetShape = targetToken?.glyph ?? level.shapes[0];
@@ -280,18 +272,10 @@ function ArcadeLevel({ level, band, hintsEnabled, wordProgress = EMPTY_PROGRESS,
     return shuffle(items);
   }, [level.id, level.colors, level.shapes, optionN, band]);
 
-  const animalRounds = useMemo(() => {
-    const n = band === '3-5' ? Math.min(3, Math.max(2, level.animals.length)) : Math.min(4, level.animals.length);
-    const pool = level.animals.slice(0, n);
-    if (!pool.length) return [];
-    const questions = Math.max(1, Math.min(need, pool.length));
-    const ordered = orderByNeed(pool, level.id, (animal) => {
-      const id = animal.labelKey.replace(/^animal\./, '');
-      const stat = wordProgress[id];
-      return !stat || isDue(stat) || stat.independent < 1;
-    });
-    return buildRounds(pool, ordered.slice(0, questions), level.id + 70, (a, b) => a.labelKey === b.labelKey);
-  }, [level.id, level.animals, band, need, wordProgress]);
+  const animalRounds = useMemo(
+    () => animalRoundsFor(level, band, playSalt, wordProgress),
+    [level, band, playSalt, wordProgress],
+  );
 
   const animalGoal = Math.max(1, animalRounds.length);
   const animalRound = animalRounds[Math.min(animalCursor, Math.max(animalRounds.length - 1, 0))];

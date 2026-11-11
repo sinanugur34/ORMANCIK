@@ -17,6 +17,11 @@ export type WordStat = {
   lastAt: number;
   /** Next time this word should be practiced again. */
   reviewAt: number;
+  /** Distinct days with an independent correct answer. Missing on older saves. */
+  independentDays?: number;
+  lastIndependentDay?: number;
+  /** Independent corrects on a different picture. */
+  transferIndependent?: number;
 };
 
 export type WordAttempt = {
@@ -30,6 +35,8 @@ export type WordAttempt = {
   correct: boolean;
   /** Defaults to listen-recognize when an older caller omits it. */
   skill?: LearningSkill;
+  /** Transfer is a different picture from the one used to introduce the word. */
+  variant?: 'find' | 'transfer' | 'listen';
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -46,6 +53,17 @@ export function applyAttempt(prev: WordStat | undefined, attempt: WordAttempt, n
     reviewAt: 0,
   };
   const correct = attempt.correct !== false;
+  const day = dayStamp(now);
+  let independentDays = base.independentDays ?? 0;
+  let lastIndependentDay = base.lastIndependentDay ?? 0;
+  let transferIndependent = base.transferIndependent ?? 0;
+  if (correct && attempt.independent) {
+    if (day !== lastIndependentDay) {
+      independentDays += 1;
+      lastIndependentDay = day;
+    }
+    if (attempt.variant === 'transfer') transferIndependent += 1;
+  }
   return {
     ...base,
     id: attempt.id,
@@ -56,11 +74,29 @@ export function applyAttempt(prev: WordStat | undefined, attempt: WordAttempt, n
     firstTry: base.firstTry + (correct && attempt.firstTry ? 1 : 0),
     lastAt: now,
     reviewAt: correct ? now + (attempt.independent ? 2 * DAY_MS : DAY_MS) : now,
+    independentDays,
+    lastIndependentDay,
+    transferIndependent,
   };
 }
 
 export function isDue(stat: WordStat, now = Date.now()): boolean {
   return stat.reviewAt > 0 && stat.reviewAt <= now;
+}
+
+function dayStamp(now: number): number {
+  const date = new Date(now);
+  return date.getUTCFullYear() * 10000 + (date.getUTCMonth() + 1) * 100 + date.getUTCDate();
+}
+
+export type FamilyStatus = 'met' | 'helped' | 'solo' | 'recalled';
+
+/** What a family can honestly say. A single sitting is not "remembered later". */
+export function familyStatus(stat: WordStat): FamilyStatus {
+  if ((stat.independentDays ?? 0) >= 2 && (stat.transferIndependent ?? 0) >= 1) return 'recalled';
+  if (stat.independent > 0) return 'solo';
+  if (stat.hinted > 0) return 'helped';
+  return 'met';
 }
 
 export function canonicalWordId(id: string): string {
@@ -81,6 +117,9 @@ function normalizeStat(id: string, stat: Partial<WordStat>): WordStat {
     attempts: asCount(stat.attempts),
     lastAt: asCount(stat.lastAt),
     reviewAt: asCount(stat.reviewAt),
+    independentDays: asCount(stat.independentDays),
+    lastIndependentDay: asCount(stat.lastIndependentDay),
+    transferIndependent: asCount(stat.transferIndependent),
   };
 }
 
@@ -96,7 +135,28 @@ function combineStats(a: WordStat, b: WordStat): WordStat {
     attempts: a.attempts + b.attempts,
     lastAt: Math.max(a.lastAt, b.lastAt),
     reviewAt,
+    independentDays: Math.max(a.independentDays ?? 0, b.independentDays ?? 0),
+    lastIndependentDay: Math.max(a.lastIndependentDay ?? 0, b.lastIndependentDay ?? 0),
+    transferIndependent: Math.max(a.transferIndependent ?? 0, b.transferIndependent ?? 0),
   };
+}
+
+/**
+ * Fold old color names, then add each new attempt once.
+ * Running this again on the result does not add the same attempt twice.
+ */
+export function commitAttempts(
+  prev: Record<string, Partial<WordStat> | undefined> | undefined,
+  attempts: WordAttempt[],
+  now = Date.now(),
+): Record<string, WordStat> {
+  const wordProgress = mergeWordProgress(prev);
+  for (const attempt of attempts) {
+    const id = canonicalWordId(attempt.id);
+    if (!id || id === 'color.unknown') continue;
+    wordProgress[id] = applyAttempt(wordProgress[id], { ...attempt, id }, now);
+  }
+  return wordProgress;
 }
 
 /** One color keeps one record. Older names such as `red` or `berry` fold into `color.*`. */

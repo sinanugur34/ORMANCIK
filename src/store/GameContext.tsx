@@ -14,14 +14,16 @@ import { COSMETICS } from '../data/cosmetics';
 import { TOTAL_LEVELS } from '../data/islands';
 import { isDeviceTurkish } from '../i18n/deviceLocale';
 import { setLanguage as setI18nLanguage, t, type Language } from '../i18n';
-import { CURRICULUM_VERSION, migrateCurriculum } from '../data/curriculum';
-import { applyAttempt, mergeWordProgress, type EnglishLevel, type WordAttempt, type WordStat } from '../data/learning';
+import { CURRICULUM_VERSION, acceptFriendsReplay, declineFriendsReplay, migrateCurriculum, saveNeedsRepairCopy } from '../data/curriculum';
+import { commitAttempts, mergeWordProgress, type EnglishLevel, type WordAttempt, type WordStat } from '../data/learning';
 import { ageToBand, AgeBand } from '../theme/colors';
 
 const STORAGE_KEY = 'ormancik-v1';
 const BACKUP_KEY = 'ormancik-v1-backup';
 /** Unreadable save kept aside before a grown-up starts a new one. */
 const QUARANTINE_KEY = 'ormancik-v1-quarantine';
+/** Copy of the file from before a curriculum or color-id repair. Written once. */
+const REPAIR_BACKUP_KEY = 'ormancik-v1-premigrate';
 /** Legacy key from Tiny Grove branding — migrated once into STORAGE_KEY. */
 const LEGACY_STORAGE_KEY = 'tiny-grove-v1';
 const PARENT_SESSION_MS = 5 * 60 * 1000;
@@ -61,6 +63,10 @@ export type ChildProfile = {
   friendsIntro: boolean;
   /** Previous activity clears for levels 1–8. Not English evidence. */
   legacyLevelIds: number[];
+  /** Grown-up can replay levels 1–8 when an older version may have skipped them. */
+  replayOffer: boolean;
+  /** Home tasks a grown-up marked as done together. Not an English score. */
+  homeTasks: string[];
 };
 
 type DevicePersisted = {
@@ -162,6 +168,11 @@ type GameContextValue = {
   parentOpen: boolean;
   friendsIntro: boolean;
   dismissFriendsIntro: () => void;
+  replayOffer: boolean;
+  acceptReplay: () => void;
+  declineReplay: () => void;
+  homeTasks: string[];
+  markHomeTask: (id: string) => void;
   retrySaveLoad: () => Promise<void>;
   restoreBackup: () => Promise<boolean>;
   /** Keeps the unreadable file aside, then allows a new save. */
@@ -219,7 +230,7 @@ function clampAge(age: number): number {
 
 function learningDefaults(raw?: Partial<ChildProfile>): Pick<
   ChildProfile,
-  'hintsEnabled' | 'englishLevel' | 'wordProgress' | 'sessionLimit' | 'levelStars'
+  'hintsEnabled' | 'englishLevel' | 'wordProgress' | 'sessionLimit' | 'levelStars' | 'replayOffer' | 'homeTasks'
 > {
   const level = raw?.englishLevel;
   return {
@@ -228,6 +239,8 @@ function learningDefaults(raw?: Partial<ChildProfile>): Pick<
     wordProgress: mergeWordProgress(raw?.wordProgress),
     sessionLimit: typeof raw?.sessionLimit === 'number' ? Math.max(0, Math.min(20, Math.round(raw.sessionLimit))) : 8,
     levelStars: raw?.levelStars && typeof raw.levelStars === 'object' ? raw.levelStars : {},
+    replayOffer: raw?.replayOffer ?? false,
+    homeTasks: Array.isArray(raw?.homeTasks) ? raw.homeTasks.filter((id) => typeof id === 'string') : [],
   };
 }
 
@@ -278,6 +291,7 @@ function profileFromSaved(raw: Partial<ChildProfile> & { name?: string; age?: nu
     contentVersion: curriculum.contentVersion,
     friendsIntro: curriculum.friendsIntro,
     legacyLevelIds: curriculum.legacyLevelIds,
+    replayOffer: curriculum.replayOffer,
   };
 }
 
@@ -393,6 +407,18 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     setState(fresh);
   }, []);
 
+  const keepRepairCopy = useCallback(async (raw: string) => {
+    try {
+      const existing = await AsyncStorage.getItem(REPAIR_BACKUP_KEY);
+      if (existing) return;
+      const parsed = JSON.parse(raw) as { profiles?: Array<{ contentVersion?: number; wordProgress?: Record<string, unknown> }> };
+      if (!saveNeedsRepairCopy(parsed)) return;
+      await AsyncStorage.setItem(REPAIR_BACKUP_KEY, raw);
+    } catch {
+      // Loading still continues. The copy is only a safety file.
+    }
+  }, []);
+
   const loadFromDisk = useCallback(async () => {
     try {
       let raw = await AsyncStorage.getItem(STORAGE_KEY);
@@ -409,12 +435,15 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
         return;
       }
       try {
-        acceptLoaded(migrateFromRaw(raw));
+        const migrated = migrateFromRaw(raw);
+        await keepRepairCopy(raw);
+        acceptLoaded(migrated);
         return;
       } catch {
         const backup = await AsyncStorage.getItem(BACKUP_KEY);
         if (backup) {
           try {
+            await keepRepairCopy(backup);
             acceptLoaded(migrateFromRaw(backup));
             return;
           } catch {
@@ -427,7 +456,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     } catch {
       holdUnreadable(null, null);
     }
-  }, [acceptLoaded, holdUnreadable]);
+  }, [acceptLoaded, holdUnreadable, keepRepairCopy]);
 
   useEffect(() => {
     let cancel = false;
@@ -627,14 +656,51 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (!attempts.length) return;
     const now = Date.now();
     commit(
-      patchActive(stateRef.current, (p) => {
-        const wordProgress = { ...p.wordProgress };
-        for (const attempt of attempts) {
-          if (!attempt.id) continue;
-          wordProgress[attempt.id] = applyAttempt(wordProgress[attempt.id], attempt, now);
-        }
-        return { ...p, wordProgress };
-      }),
+      patchActive(stateRef.current, (p) => ({
+        ...p,
+        wordProgress: commitAttempts(p.wordProgress, attempts, now),
+      })),
+    );
+  }, [commit]);
+
+  const acceptReplay = useCallback(() => {
+    commit(
+      patchActive(stateRef.current, (p) => ({
+        ...p,
+        ...acceptFriendsReplay({
+          clearedLevelIds: p.clearedLevelIds,
+          levelStars: p.levelStars,
+          contentVersion: p.contentVersion,
+          friendsIntro: p.friendsIntro,
+          legacyLevelIds: p.legacyLevelIds,
+          replayOffer: p.replayOffer,
+        }),
+      })),
+    );
+  }, [commit]);
+
+  const declineReplay = useCallback(() => {
+    commit(
+      patchActive(stateRef.current, (p) => ({
+        ...p,
+        ...declineFriendsReplay({
+          clearedLevelIds: p.clearedLevelIds,
+          levelStars: p.levelStars,
+          contentVersion: p.contentVersion,
+          friendsIntro: p.friendsIntro,
+          legacyLevelIds: p.legacyLevelIds,
+          replayOffer: p.replayOffer,
+        }),
+      })),
+    );
+  }, [commit]);
+
+  const markHomeTask = useCallback((id: string) => {
+    commit(
+      patchActive(stateRef.current, (p) => ({
+        ...p,
+        homeTasks: p.homeTasks.includes(id) ? p.homeTasks : [...p.homeTasks, id],
+      })),
     );
   }, [commit]);
 
@@ -784,6 +850,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       parentUnlockedUntil: state.parentUnlockedUntil,
       parentOpen,
       friendsIntro: activeProfile?.friendsIntro ?? false,
+      replayOffer: activeProfile?.replayOffer ?? false,
+      homeTasks: activeProfile?.homeTasks ?? [],
       createProfile,
       switchProfile,
       deleteProfile,
@@ -804,6 +872,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       resetProgress,
       dismissSitting,
       dismissFriendsIntro,
+      acceptReplay,
+      declineReplay,
+      markHomeTask,
       setHintsEnabled,
       setEnglishLevel,
       setSessionLimit,
@@ -852,6 +923,9 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       resetProgress,
       dismissSitting,
       dismissFriendsIntro,
+      acceptReplay,
+      declineReplay,
+      markHomeTask,
       setHintsEnabled,
       setEnglishLevel,
       setSessionLimit,
