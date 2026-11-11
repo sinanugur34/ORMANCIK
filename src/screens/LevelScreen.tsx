@@ -18,6 +18,7 @@ import { LevelPlay } from '../components/LevelPlay';
 import { BouncePress, FadeInView } from '../components/Motion';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SparkleBurst } from '../components/SparkleBurst';
+import { isDue } from '../data/learning';
 import { displayIslandName, islandForLevel } from '../data/islands';
 import { buildLevel } from '../data/levels';
 import { useT } from '../i18n';
@@ -46,12 +47,35 @@ function StarRow({ stars }: { stars: 1 | 2 | 3 }) {
 export function LevelScreen({ navigation, route }: Props) {
   const t = useT();
   const { levelId } = route.params;
-  const { ageBand, clearLevel, hintsEnabled, isLevelUnlocked, language, recordLearning } = useGame();
+  const {
+    ageBand,
+    clearLevel,
+    hintsEnabled,
+    isLevelUnlocked,
+    language,
+    recordLearning,
+    englishLevel,
+    wordProgress,
+    sessionLimit,
+    sittingCount,
+    dismissSitting,
+  } = useGame();
   const band = ageBand ?? '3-5';
-  const level = useMemo(() => buildLevel(levelId, band, language), [levelId, band, language]);
+  const knownIds = useMemo(
+    () =>
+      Object.values(wordProgress)
+        .filter((stat) => stat.independent >= 2 && !isDue(stat))
+        .map((stat) => stat.id),
+    [wordProgress],
+  );
+  const level = useMemo(
+    () => buildLevel(levelId, band, language, { englishLevel, knownIds }),
+    [levelId, band, language, englishLevel, knownIds],
+  );
   const island = islandForLevel(levelId);
   const islandLabel = displayIslandName(island);
   const [won, setWon] = useState(false);
+  const [breakAsk, setBreakAsk] = useState(false);
   const [stars, setStars] = useState<1 | 2 | 3>(3);
   const [awarded, setAwarded] = useState(level.reward);
   const pulse = useSharedValue(1);
@@ -103,6 +127,7 @@ export function LevelScreen({ navigation, route }: Props) {
             level={level}
             band={band}
             hintsEnabled={hintsEnabled}
+            wordProgress={wordProgress}
             onWin={(result) => {
               const coins = clearLevel(levelId, level.reward, result.stars);
               recordLearning(result.words);
@@ -128,12 +153,24 @@ export function LevelScreen({ navigation, route }: Props) {
               <StarRow stars={stars} />
             </LinearGradient>
             <View style={styles.modalActions}>
+              {breakAsk ? (
+                <View style={{ marginBottom: 8 }}>
+                  <Text style={styles.breakTitle}>{t('home.breakTitle')}</Text>
+                  <Text style={styles.breakBody}>{t('home.breakBody')}</Text>
+                </View>
+              ) : null}
               {levelId < 80 ? (
                 <Animated.View style={devamStyle}>
                   <PrimaryButton
-                    label={t('level.continue')}
+                    label={breakAsk ? t('home.breakContinue') : t('level.continue')}
                     tone="sun"
                     onPress={() => {
+                      if (!breakAsk && sessionLimit > 0 && sittingCount >= sessionLimit) {
+                        setBreakAsk(true);
+                        return;
+                      }
+                      if (breakAsk) dismissSitting();
+                      setBreakAsk(false);
                       setWon(false);
                       navigation.replace('Level', { levelId: levelId + 1 });
                     }}
@@ -145,8 +182,10 @@ export function LevelScreen({ navigation, route }: Props) {
                 large={false}
                 style={{ marginTop: 12 }}
                 onPress={() => {
-                  setWon(false);
-                  navigation.navigate('Map');
+                  navigation.reset({
+                    index: 1,
+                    routes: [{ name: 'Home' }, { name: 'Map' }],
+                  });
                 }}
               />
             </View>
@@ -222,4 +261,6 @@ const styles = StyleSheet.create({
   starOff: { backgroundColor: 'rgba(255,255,255,0.25)' },
   starGlyph: { fontSize: 22, color: colors.forestDeep, fontWeight: '900' },
   modalActions: { padding: 20 },
+  breakTitle: { fontSize: 20, fontWeight: '900', color: colors.forestDeep, textAlign: 'center' },
+  breakBody: { marginTop: 4, color: colors.muted, fontWeight: '700', textAlign: 'center' },
 });

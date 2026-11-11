@@ -10,4 +10,5 @@ export type RootStackParamList = {
   Settings: undefined;
   Privacy: undefined;
   WordAlbum: undefined;
+  Review: { wordIds?: string[] } | undefined;
 };

@@ -37,9 +37,10 @@ export function ShopScreen({ navigation }: Props) {
     ownCosmetic,
     equipCosmetic,
     activeProfileId,
-    parentUnlockedUntil,
+    parentOpen,
+    lockParent,
   } = useGame();
-  const commercial = parentUnlockedUntil > Date.now();
+  const commercial = parentOpen;
   const [gate, setGate] = useState<GateAction>(null);
   const [busy, setBusy] = useState(false);
   const [banner, setBanner] = useState<{ message: string; tone: 'ok' | 'error' | 'info' | 'warn' } | null>(
@@ -140,6 +141,13 @@ export function ShopScreen({ navigation }: Props) {
 
           {commercial ? (
           <>
+          <PrimaryButton
+            label={t('shop.leaveGrownups')}
+            tone="sky"
+            large={false}
+            onPress={lockParent}
+            style={{ marginBottom: 12 }}
+          />
           <FadeInView>
             <View style={styles.earnCard}>
               <Text style={styles.earnTitle}>{t('shop.earnTitle')}</Text>

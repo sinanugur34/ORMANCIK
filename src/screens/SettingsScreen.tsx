@@ -52,7 +52,7 @@ export function SettingsScreen({ navigation }: Props) {
     setEnglishLevel,
     sessionLimit,
     setSessionLimit,
-    saveWarning,
+    saveIssue,
   } = useGame();
   const [ageDraft, setAgeDraft] = useState(childAge ?? 5);
   const [gate, setGate] = useState<GateKind>(null);
@@ -251,7 +251,8 @@ export function SettingsScreen({ navigation }: Props) {
             />
           </FadeInView>
 
-          {saveWarning ? <StatusBanner message={t('settings.saveWarning')} tone="warn" /> : null}
+          {saveIssue === 'read' ? <StatusBanner message={t('settings.saveWarning')} tone="warn" /> : null}
+          {saveIssue === 'write' ? <StatusBanner message={t('settings.saveWriteWarning')} tone="warn" /> : null}
 
           <FadeInView delay={60} style={styles.card}>
             <Text style={styles.h}>{t('settings.learning')}</Text>
@@ -277,6 +278,15 @@ export function SettingsScreen({ navigation }: Props) {
                 </BouncePress>
               ))}
             </View>
+            <Text style={styles.sub}>
+              {t(
+                englishLevel === 'new'
+                  ? 'settings.levelNewHelp'
+                  : englishLevel === 'some'
+                    ? 'settings.levelSomeHelp'
+                    : 'settings.levelReadyHelp',
+              )}
+            </Text>
             <PrimaryButton
               label={sessionLimit === 0 ? t('settings.sessionOff') : t('settings.session', { n: sessionLimit })}
               large={false}

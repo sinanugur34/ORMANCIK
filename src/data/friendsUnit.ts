@@ -1,5 +1,6 @@
 import { tFor, type Language } from '../i18n';
 import type { AgeBand } from '../theme/colors';
+import type { EnglishLevel } from './learning';
 import { islandForLevel } from './islands';
 import type { LevelDef } from './levels';
 
@@ -21,9 +22,10 @@ export type LessonStep = {
   choices: LessonChoice[];
 };
 
-type Word = {
+export type CatalogWord = {
   id: string;
   emoji: string;
+  emojiAlt: string;
   en: string;
   tr: string;
   model: string;
@@ -34,10 +36,11 @@ type Word = {
   transferClip: string;
 };
 
-const WORDS: Record<string, Word> = {
+const WORDS: Record<string, CatalogWord> = {
   hello: {
     id: 'hello',
     emoji: '🙋',
+    emojiAlt: '🧒',
     en: 'hello',
     tr: 'merhaba',
     model: 'Hello.',
@@ -50,6 +53,7 @@ const WORDS: Record<string, Word> = {
   bye: {
     id: 'bye',
     emoji: '👋',
+    emojiAlt: '🚶',
     en: 'bye',
     tr: 'hoşça kal',
     model: 'Bye.',
@@ -62,6 +66,7 @@ const WORDS: Record<string, Word> = {
   cat: {
     id: 'cat',
     emoji: '🐱',
+    emojiAlt: '🐈',
     en: 'cat',
     tr: 'kedi',
     model: 'Cat. This is a cat.',
@@ -74,6 +79,7 @@ const WORDS: Record<string, Word> = {
   dog: {
     id: 'dog',
     emoji: '🐶',
+    emojiAlt: '🐕',
     en: 'dog',
     tr: 'köpek',
     model: 'Dog. This is a dog.',
@@ -86,6 +92,7 @@ const WORDS: Record<string, Word> = {
   rabbit: {
     id: 'rabbit',
     emoji: '🐰',
+    emojiAlt: '🐇',
     en: 'rabbit',
     tr: 'tavşan',
     model: 'Rabbit. This is a rabbit.',
@@ -97,34 +104,77 @@ const WORDS: Record<string, Word> = {
   },
 };
 
-const EXTRA: Word[] = [
-  {
-    id: 'bear',
-    emoji: '🐻',
-    en: 'bear',
-    tr: 'ayı',
-    model: '',
-    modelClip: '',
-    find: '',
-    findClip: '',
-    transfer: '',
-    transferClip: '',
-  },
-  {
-    id: 'fox',
-    emoji: '🦊',
-    en: 'fox',
-    tr: 'tilki',
-    model: '',
-    modelClip: '',
-    find: '',
-    findClip: '',
-    transfer: '',
-    transferClip: '',
-  },
+const EXTRA: CatalogWord[] = [
+  { id: 'bear', emoji: '🐻', emojiAlt: '🧸', en: 'bear', tr: 'ayı', model: '', modelClip: '', find: 'Find the bear.', findClip: '', transfer: 'Touch the bear.', transferClip: '' },
+  { id: 'fox', emoji: '🦊', emojiAlt: '🦊', en: 'fox', tr: 'tilki', model: '', modelClip: '', find: 'Find the fox.', findClip: '', transfer: 'Touch the fox.', transferClip: '' },
+  { id: 'frog', emoji: '🐸', emojiAlt: '🐸', en: 'frog', tr: 'kurbağa', model: '', modelClip: '', find: 'Find the frog.', findClip: '', transfer: 'Touch the frog.', transferClip: '' },
+  { id: 'panda', emoji: '🐼', emojiAlt: '🐼', en: 'panda', tr: 'panda', model: '', modelClip: '', find: 'Find the panda.', findClip: '', transfer: 'Touch the panda.', transferClip: '' },
+  { id: 'chick', emoji: '🐥', emojiAlt: '🐤', en: 'chick', tr: 'civciv', model: '', modelClip: '', find: 'Find the chick.', findClip: '', transfer: 'Touch the chick.', transferClip: '' },
+  { id: 'pig', emoji: '🐷', emojiAlt: '🐖', en: 'pig', tr: 'domuz', model: '', modelClip: '', find: 'Find the pig.', findClip: '', transfer: 'Touch the pig.', transferClip: '' },
+  { id: 'unicorn', emoji: '🦄', emojiAlt: '🦄', en: 'unicorn', tr: 'tek boynuz', model: '', modelClip: '', find: 'Find the unicorn.', findClip: '', transfer: 'Touch the unicorn.', transferClip: '' },
 ];
 
-const POOL: Word[] = [...Object.values(WORDS), ...EXTRA];
+const REVIEW_EXTRA: CatalogWord[] = [
+  { id: 'red', emoji: '🔴', emojiAlt: '🟥', en: 'red', tr: 'kırmızı', model: '', modelClip: '', find: 'Find the red.', findClip: '', transfer: 'Touch the red.', transferClip: '' },
+  { id: 'yellow', emoji: '🟡', emojiAlt: '🟨', en: 'yellow', tr: 'sarı', model: '', modelClip: '', find: 'Find the yellow.', findClip: '', transfer: 'Touch the yellow.', transferClip: '' },
+  { id: 'green', emoji: '🟢', emojiAlt: '🟩', en: 'green', tr: 'yeşil', model: '', modelClip: '', find: 'Find the green.', findClip: '', transfer: 'Touch the green.', transferClip: '' },
+  { id: 'blue', emoji: '🔵', emojiAlt: '🟦', en: 'blue', tr: 'mavi', model: '', modelClip: '', find: 'Find the blue.', findClip: '', transfer: 'Touch the blue.', transferClip: '' },
+  { id: 'purple', emoji: '🟣', emojiAlt: '🟪', en: 'purple', tr: 'mor', model: '', modelClip: '', find: 'Find the purple.', findClip: '', transfer: 'Touch the purple.', transferClip: '' },
+  { id: 'orange', emoji: '🟠', emojiAlt: '🟧', en: 'orange', tr: 'turuncu', model: '', modelClip: '', find: 'Find the orange.', findClip: '', transfer: 'Touch the orange.', transferClip: '' },
+  { id: 'one', emoji: '🍎', emojiAlt: '🌟', en: 'one', tr: 'bir', model: '', modelClip: '', find: 'Find one.', findClip: '', transfer: 'Touch one.', transferClip: '' },
+  { id: 'two', emoji: '🍎🍎', emojiAlt: '🌟🌟', en: 'two', tr: 'iki', model: '', modelClip: '', find: 'Find two.', findClip: '', transfer: 'Touch two.', transferClip: '' },
+  { id: 'three', emoji: '🍎🍎🍎', emojiAlt: '🌟🌟🌟', en: 'three', tr: 'üç', model: '', modelClip: '', find: 'Find three.', findClip: '', transfer: 'Touch three.', transferClip: '' },
+  { id: 'four', emoji: '🍎🍎🍎🍎', emojiAlt: '🌟🌟🌟🌟', en: 'four', tr: 'dört', model: '', modelClip: '', find: 'Find four.', findClip: '', transfer: 'Touch four.', transferClip: '' },
+  { id: 'five', emoji: '🍎🍎🍎🍎🍎', emojiAlt: '🌟🌟🌟🌟🌟', en: 'five', tr: 'beş', model: '', modelClip: '', find: 'Find five.', findClip: '', transfer: 'Touch five.', transferClip: '' },
+  { id: 'big', emoji: '🐘', emojiAlt: '🦒', en: 'big', tr: 'büyük', model: '', modelClip: '', find: 'Find the big one.', findClip: '', transfer: 'Touch the big one.', transferClip: '' },
+  { id: 'small', emoji: '🐭', emojiAlt: '🐜', en: 'small', tr: 'küçük', model: '', modelClip: '', find: 'Find the small one.', findClip: '', transfer: 'Touch the small one.', transferClip: '' },
+  { id: 'circle', emoji: '●', emojiAlt: '⬤', en: 'circle', tr: 'daire', model: '', modelClip: '', find: 'Find the circle.', findClip: '', transfer: 'Touch the circle.', transferClip: '' },
+  { id: 'square', emoji: '■', emojiAlt: '▢', en: 'square', tr: 'kare', model: '', modelClip: '', find: 'Find the square.', findClip: '', transfer: 'Touch the square.', transferClip: '' },
+  { id: 'triangle', emoji: '▲', emojiAlt: '△', en: 'triangle', tr: 'üçgen', model: '', modelClip: '', find: 'Find the triangle.', findClip: '', transfer: 'Touch the triangle.', transferClip: '' },
+  { id: 'star', emoji: '★', emojiAlt: '☆', en: 'star', tr: 'yıldız', model: '', modelClip: '', find: 'Find the star.', findClip: '', transfer: 'Touch the star.', transferClip: '' },
+  { id: 'diamond', emoji: '◆', emojiAlt: '◇', en: 'diamond', tr: 'elmas', model: '', modelClip: '', find: 'Find the diamond.', findClip: '', transfer: 'Touch the diamond.', transferClip: '' },
+  { id: 'heart', emoji: '♥', emojiAlt: '♡', en: 'heart', tr: 'kalp', model: '', modelClip: '', find: 'Find the heart.', findClip: '', transfer: 'Touch the heart.', transferClip: '' },
+];
+
+const POOL: CatalogWord[] = [...Object.values(WORDS), ...EXTRA];
+const REVIEW_POOL: CatalogWord[] = [...POOL, ...REVIEW_EXTRA];
+
+export type AlbumWord = {
+  id: string;
+  en: string;
+  tr: string;
+  emoji: string;
+  clipId?: string;
+};
+
+export function listAlbumWords(): AlbumWord[] {
+  const seen = new Set<string>();
+  const out: AlbumWord[] = [];
+  for (const word of [...Object.values(WORDS), ...EXTRA]) {
+    if (seen.has(word.id)) continue;
+    seen.add(word.id);
+    out.push({
+      id: word.id,
+      en: word.en,
+      tr: word.tr,
+      emoji: word.emoji,
+      clipId: word.modelClip || undefined,
+    });
+  }
+  return out;
+}
+
+export function albumWord(id: string): AlbumWord | null {
+  const word = REVIEW_POOL.find((item) => item.id === id);
+  if (!word) return null;
+  return {
+    id: word.id,
+    en: word.en,
+    tr: word.tr,
+    emoji: word.emoji,
+    clipId: word.modelClip || undefined,
+  };
+}
 
 function mixSeed(seed: number): number {
   let s = seed >>> 0;
@@ -132,19 +182,34 @@ function mixSeed(seed: number): number {
   return s;
 }
 
-function choicesFor(target: Word, band: AgeBand, salt: number): LessonChoice[] {
-  const distractorCount = band === '3-5' ? 1 : 2;
-  const pool = POOL.filter((w) => w.id !== target.id && w.emoji !== target.emoji);
-  const picked: Word[] = [];
+function picture(word: CatalogWord, kind: LessonStep['kind']): string {
+  return kind === 'transfer' ? word.emojiAlt : word.emoji;
+}
+
+function distractorCount(band: AgeBand, englishLevel: EnglishLevel): number {
+  const base = band === '3-5' ? 1 : 2;
+  return Math.min(4, englishLevel === 'ready' ? base + 1 : base);
+}
+
+function choicesFor(
+  target: CatalogWord,
+  band: AgeBand,
+  salt: number,
+  kind: LessonStep['kind'],
+  englishLevel: EnglishLevel,
+  pool: CatalogWord[] = POOL,
+): LessonChoice[] {
+  const count = distractorCount(band, englishLevel);
+  const distractors = pool.filter((w) => w.id !== target.id && picture(w, kind) !== picture(target, kind));
+  const picked: CatalogWord[] = [];
   let state = salt;
-  const copy = [...pool];
-  while (picked.length < distractorCount && copy.length) {
+  const copy = [...distractors];
+  while (picked.length < count && copy.length) {
     state = mixSeed(state + picked.length + 1);
     const index = state % copy.length;
     picked.push(copy.splice(index, 1)[0]!);
   }
-  const all = [target, ...picked];
-  const order = [...all];
+  const order = [target, ...picked];
   let shuffleState = salt + 17;
   for (let i = order.length - 1; i > 0; i--) {
     shuffleState = mixSeed(shuffleState + i);
@@ -153,14 +218,21 @@ function choicesFor(target: Word, band: AgeBand, salt: number): LessonChoice[] {
     order[i] = order[j]!;
     order[j] = tmp;
   }
-  return order.map((w) => ({ id: w.id, emoji: w.emoji, labelEn: w.en, labelTr: w.tr }));
+  return order.map((w) => ({
+    id: w.id,
+    emoji: picture(w, kind),
+    labelEn: w.en,
+    labelTr: w.tr,
+  }));
 }
 
 function step(
-  word: Word,
+  word: CatalogWord,
   kind: LessonStep['kind'],
   band: AgeBand,
   salt: number,
+  englishLevel: EnglishLevel,
+  pool: CatalogWord[] = POOL,
 ): LessonStep {
   const say = kind === 'model' ? word.model : kind === 'transfer' ? word.transfer : word.find;
   const clipId = kind === 'model' ? word.modelClip : kind === 'transfer' ? word.transferClip : word.findClip;
@@ -169,40 +241,57 @@ function step(
     wordId: word.id,
     say,
     clipId,
-    emoji: word.emoji,
+    emoji: picture(word, kind),
     hintTr: word.tr,
-    choices: kind === 'model' ? [] : choicesFor(word, band, salt),
+    choices: kind === 'model' ? [] : choicesFor(word, band, salt, kind, englishLevel, pool),
   };
 }
 
-function script(levelId: number, band: AgeBand): LessonStep[] {
+function script(levelId: number, band: AgeBand, englishLevel: EnglishLevel): LessonStep[] {
   const w = WORDS;
-  if (levelId === 1) return [step(w.hello, 'model', band, 1), step(w.hello, 'find', band, 2)];
-  if (levelId === 2) return [step(w.bye, 'model', band, 3), step(w.bye, 'find', band, 4)];
-  if (levelId === 3) {
-    return [step(w.cat, 'model', band, 5), step(w.cat, 'find', band, 6), step(w.cat, 'transfer', band, 7)];
+  const s = (word: CatalogWord, kind: LessonStep['kind'], salt: number) =>
+    step(word, kind, band, salt, englishLevel);
+  if (levelId === 1) return [s(w.hello, 'model', 1), s(w.hello, 'find', 2)];
+  if (levelId === 2) return [s(w.bye, 'model', 3), s(w.bye, 'find', 4)];
+  if (levelId === 3) return [s(w.cat, 'model', 5), s(w.cat, 'find', 6), s(w.cat, 'transfer', 7)];
+  if (levelId === 4) return [s(w.dog, 'model', 8), s(w.dog, 'find', 9), s(w.dog, 'transfer', 10)];
+  if (levelId === 5) return [s(w.rabbit, 'model', 11), s(w.rabbit, 'find', 12), s(w.rabbit, 'transfer', 13)];
+  if (levelId === 6) return [s(w.cat, 'find', 14), s(w.dog, 'find', 15), s(w.rabbit, 'find', 16)];
+  if (levelId === 7) return [s(w.hello, 'find', 17), s(w.bye, 'find', 18)];
+  return [s(w.cat, 'transfer', 19), s(w.dog, 'transfer', 20), s(w.rabbit, 'transfer', 21)];
+}
+
+export type FriendsLearning = {
+  englishLevel?: EnglishLevel;
+  /** Words with a solid independent record that are not due. Used on review lessons. */
+  knownIds?: string[];
+};
+
+function applyStartingLevel(lesson: LessonStep[], levelId: number, learning?: FriendsLearning): LessonStep[] {
+  const englishLevel = learning?.englishLevel ?? 'new';
+  let next = lesson;
+  if (englishLevel === 'some' || englishLevel === 'ready') {
+    const withoutModel = next.filter((item) => item.kind !== 'model');
+    if (withoutModel.length) next = withoutModel;
   }
-  if (levelId === 4) {
-    return [step(w.dog, 'model', band, 8), step(w.dog, 'find', band, 9), step(w.dog, 'transfer', band, 10)];
+  if (englishLevel === 'ready' && levelId >= 6) {
+    const known = new Set(learning?.knownIds ?? []);
+    const fresh = next.filter((item) => !known.has(item.wordId));
+    if (fresh.length) next = fresh;
   }
-  if (levelId === 5) {
-    return [
-      step(w.rabbit, 'model', band, 11),
-      step(w.rabbit, 'find', band, 12),
-      step(w.rabbit, 'transfer', band, 13),
-    ];
-  }
-  if (levelId === 6) {
-    return [step(w.cat, 'find', band, 14), step(w.dog, 'find', band, 15), step(w.rabbit, 'find', band, 16)];
-  }
-  if (levelId === 7) return [step(w.hello, 'find', band, 17), step(w.bye, 'find', band, 18)];
-  return [step(w.cat, 'transfer', band, 19), step(w.dog, 'transfer', band, 20), step(w.rabbit, 'transfer', band, 21)];
+  return next;
 }
 
 /** First eight levels are one English “first friends” unit. Later levels stay mixed practice. */
-export function buildFriendsLevel(levelId: number, band: AgeBand, lang: Language): LevelDef | null {
+export function buildFriendsLevel(
+  levelId: number,
+  band: AgeBand,
+  lang: Language,
+  learning?: FriendsLearning,
+): LevelDef | null {
   if (levelId < 1 || levelId > 8) return null;
-  const lesson = script(levelId, band);
+  const englishLevel = learning?.englishLevel ?? 'new';
+  const lesson = applyStartingLevel(script(levelId, band, englishLevel), levelId, learning);
   const island = islandForLevel(levelId);
   const reward = band === '3-5' ? 8 : band === '6-8' ? 12 : 16;
   return {
@@ -211,7 +300,35 @@ export function buildFriendsLevel(levelId: number, band: AgeBand, lang: Language
     title: tFor(lang, 'unit.friends.levelTitle', { n: levelId }),
     template: 'lesson',
     reward,
-    optionCount: Math.max(2, lesson.find((s) => s.choices.length > 0)?.choices.length ?? 2),
+    optionCount: Math.max(2, lesson.find((item) => item.choices.length > 0)?.choices.length ?? 2),
+    targetCount: lesson.length,
+    timerSec: undefined,
+    colors: [],
+    shapes: [],
+    shapeTokens: [],
+    animals: [],
+    prompt: lesson[0]?.say ?? 'Listen.',
+    lesson,
+  };
+}
+
+/** Short practice from the album. Uses the other picture for each word. */
+export function buildReviewLevel(wordIds: string[], band: AgeBand, lang: Language): LevelDef | null {
+  const unique = Array.from(new Set(wordIds)).slice(0, 4);
+  const words = unique
+    .map((id) => REVIEW_POOL.find((item) => item.id === id))
+    .filter((item): item is CatalogWord => item != null);
+  if (!words.length) return null;
+  const lesson = words.map((word, index) =>
+    step(word, 'transfer', band, 40 + index, 'some', REVIEW_POOL),
+  );
+  return {
+    id: 0,
+    islandId: 'meadow',
+    title: tFor(lang, 'album.reviewTitle'),
+    template: 'lesson',
+    reward: 0,
+    optionCount: Math.max(2, lesson[0]?.choices.length ?? 2),
     targetCount: lesson.length,
     timerSec: undefined,
     colors: [],

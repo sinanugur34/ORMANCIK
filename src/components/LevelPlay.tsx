@@ -9,8 +9,9 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { speakKidPrompt, speakPraise, stopSpeaking } from '../audio/speakPrompt';
+import { buildRounds, orderByNeed, seededShuffle } from '../data/rounds';
 import { tFor, useT } from '../i18n';
-import type { WordAttempt } from '../data/learning';
+import { isDue, type WordAttempt, type WordStat } from '../data/learning';
 import { LevelDef, starsFromMistakes } from '../data/levels';
 import { AgeBand, colors } from '../theme/colors';
 import { colorName } from '../theme/colorNames';
@@ -20,10 +21,25 @@ import type { LevelWin } from './levelWin';
 import { BouncePress } from './Motion';
 import { SparkleBurst } from './SparkleBurst';
 
+const ENGLISH_TEMPLATES = new Set([
+  'animalMatch',
+  'colorMatch',
+  'shapeSort',
+  'countCollect',
+  'sizeCompare',
+  'sequence',
+]);
+
+const COUNT_WORDS = ['', 'one', 'two', 'three', 'four', 'five'];
+const COUNT_TR = ['', 'bir', 'iki', 'üç', 'dört', 'beş'];
+const COUNT_EMOJI = ['🍎', '🌟', '🍃', '🌸'];
+const EMPTY_PROGRESS: Record<string, WordStat> = {};
+
 type Props = {
   level: LevelDef;
   band: AgeBand;
   hintsEnabled: boolean;
+  wordProgress?: Record<string, WordStat>;
   onWin: (result: LevelWin) => void;
 };
 
@@ -42,7 +58,7 @@ function btnSize(band: AgeBand): number {
   return 70;
 }
 
-function ArcadeLevel({ level, band, hintsEnabled, onWin }: Props) {
+function ArcadeLevel({ level, band, hintsEnabled, wordProgress = EMPTY_PROGRESS, onWin }: Props) {
   const t = useT();
   const [feedback, setFeedback] = useState<'idle' | 'good' | 'bad'>('idle');
   const [coach, setCoach] = useState<string | null>(null);
@@ -59,9 +75,9 @@ function ArcadeLevel({ level, band, hintsEnabled, onWin }: Props) {
   const [memoryMatched, setMemoryMatched] = useState<number[]>([]);
   const [animalCursor, setAnimalCursor] = useState(0);
   const [animalHelp, setAnimalHelp] = useState(false);
+  const [roundHelp, setRoundHelp] = useState(false);
   const pop = useSharedValue(1);
   const size = btnSize(band);
-  const showLabels = band !== '9-10' || level.template === 'shapeSort';
   const settled = useRef(false);
   const mistakesRef = useRef(0);
   const comparingMemory = useRef(false);
@@ -70,6 +86,9 @@ function ArcadeLevel({ level, band, hintsEnabled, onWin }: Props) {
   const animalBusy = useRef(false);
   const animalHelpUsed = useRef(false);
   const animalMissed = useRef(false);
+  const roundBusy = useRef(false);
+  const roundHelpRef = useRef(false);
+  const roundMissRef = useRef(false);
   const wordLog = useRef<WordAttempt[]>([]);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
@@ -82,6 +101,9 @@ function ArcadeLevel({ level, band, hintsEnabled, onWin }: Props) {
     animalBusy.current = false;
     animalHelpUsed.current = false;
     animalMissed.current = false;
+    roundBusy.current = false;
+    roundHelpRef.current = false;
+    roundMissRef.current = false;
     wordLog.current = [];
     setProgress(0);
     setMistakes(0);
@@ -97,6 +119,7 @@ function ArcadeLevel({ level, band, hintsEnabled, onWin }: Props) {
     setMemoryMatched([]);
     setAnimalCursor(0);
     setAnimalHelp(false);
+    setRoundHelp(false);
     return () => {
       timers.current.forEach(clearTimeout);
       timers.current = [];
@@ -104,7 +127,7 @@ function ArcadeLevel({ level, band, hintsEnabled, onWin }: Props) {
   }, [level.id]);
 
   useEffect(() => {
-    if (level.template === 'animalMatch') return;
+    if (ENGLISH_TEMPLATES.has(level.template)) return;
     void speakKidPrompt(level.prompt);
     return () => {
       void stopSpeaking();
@@ -126,25 +149,57 @@ function ArcadeLevel({ level, band, hintsEnabled, onWin }: Props) {
     return () => clearInterval(id);
   }, [level.id, level.timerSec]);
 
-  const targetColor = level.colors[0];
-  const targetShape = level.shapes[0];
-  const targetToken = level.shapeTokens[0];
   const need = Math.max(1, Math.min(level.targetCount, band === '3-5' ? 2 : 4));
   const optionN = band === '3-5' ? Math.min(level.optionCount, 3) : level.optionCount;
 
-  const colorOptions = useMemo(
-    () => shuffle(level.colors.slice(0, optionN)),
-    [level.id, level.colors, optionN],
-  );
-  const shapeOptions = useMemo(
-    () => shuffle(level.shapeTokens.slice(0, optionN)),
-    [level.id, level.shapeTokens, optionN],
-  );
+  const colorRounds = useMemo(() => {
+    const pool = level.colors.slice(0, Math.max(2, optionN));
+    if (!pool.length) return [];
+    const targets = seededShuffle(pool, level.id + 11).slice(0, Math.max(1, Math.min(need, pool.length)));
+    return buildRounds(pool, targets, level.id + 23, (a, b) => a === b);
+  }, [level.id, level.colors, optionN, need]);
+
+  const shapeRounds = useMemo(() => {
+    const pool = level.shapeTokens.slice(0, Math.max(2, optionN));
+    if (!pool.length) return [];
+    const targets = seededShuffle(pool, level.id + 29).slice(0, Math.max(1, Math.min(need, pool.length)));
+    return buildRounds(pool, targets, level.id + 41, (a, b) => a.glyph === b.glyph);
+  }, [level.id, level.shapeTokens, optionN, need]);
+
+  const countRounds = useMemo(() => {
+    const counts = [1, 2, 3, 4, 5];
+    const questions = Math.max(1, Math.min(need, 3));
+    const targets = seededShuffle(counts, level.id + 31).slice(0, questions);
+    return targets.map((count, question) => {
+      const near = seededShuffle(
+        counts.filter((n) => n !== count),
+        level.id + question,
+      ).slice(0, 2);
+      const choices = buildRounds([count, ...near], [count], level.id + 80 + question, (a, b) => a === b)[0]
+        ?.options ?? [count, ...near];
+      return {
+        count,
+        emoji: COUNT_EMOJI[question % COUNT_EMOJI.length] ?? '🍎',
+        choices,
+      };
+    });
+  }, [level.id, need]);
+
+  const colorRound = colorRounds[Math.min(progress, Math.max(colorRounds.length - 1, 0))];
+  const shapeRound = shapeRounds[Math.min(progress, Math.max(shapeRounds.length - 1, 0))];
+  const countRound = countRounds[Math.min(progress, Math.max(countRounds.length - 1, 0))];
+  const targetColor = colorRound?.target ?? level.colors[0];
+  const targetToken = shapeRound?.target ?? level.shapeTokens[0];
+  const targetShape = targetToken?.glyph ?? level.shapes[0];
+  const colorOptions = colorRound?.options ?? level.colors.slice(0, optionN);
+  const shapeOptions = shapeRound?.options ?? level.shapeTokens.slice(0, optionN);
+  const sizeAskBig = (level.findBigger !== false) === (progress % 2 === 0);
 
   const sequence = useMemo(() => {
     const n = band === '3-5' ? 2 : Math.min(3, optionN);
-    return level.colors.slice(0, n);
-  }, [level, band, optionN]);
+    const shift = progress % Math.max(level.colors.length, 1);
+    return Array.from({ length: Math.min(n, level.colors.length) }, (_, k) => level.colors[(shift + k) % level.colors.length]!);
+  }, [level.colors, band, optionN, progress]);
 
   const sequenceOptions = useMemo(() => shuffle(sequence), [sequence]);
 
@@ -208,13 +263,23 @@ function ArcadeLevel({ level, band, hintsEnabled, onWin }: Props) {
     return shuffle(items);
   }, [level.id, level.colors, level.shapes, optionN, band]);
 
-  const animalOptions = useMemo(() => {
+  const animalRounds = useMemo(() => {
     const n = band === '3-5' ? Math.min(3, Math.max(2, level.animals.length)) : Math.min(4, level.animals.length);
-    return shuffle(level.animals.slice(0, n));
-  }, [level.id, level.animals, band]);
+    const pool = level.animals.slice(0, n);
+    if (!pool.length) return [];
+    const questions = Math.max(1, Math.min(need, pool.length));
+    const ordered = orderByNeed(pool, level.id, (animal) => {
+      const id = animal.labelKey.replace(/^animal\./, '');
+      const stat = wordProgress[id];
+      return !stat || isDue(stat) || stat.independent < 1;
+    });
+    return buildRounds(pool, ordered.slice(0, questions), level.id + 70, (a, b) => a.labelKey === b.labelKey);
+  }, [level.id, level.animals, band, need, wordProgress]);
 
-  const animalGoal = Math.max(1, Math.min(need, Math.max(animalOptions.length, 1)));
-  const targetAnimal = animalOptions[Math.min(animalCursor, Math.max(animalOptions.length - 1, 0))];
+  const animalGoal = Math.max(1, animalRounds.length);
+  const animalRound = animalRounds[Math.min(animalCursor, Math.max(animalRounds.length - 1, 0))];
+  const animalOptions = animalRound?.options ?? [];
+  const targetAnimal = animalRound?.target;
   const animalPrompt = targetAnimal
     ? `Find the ${tFor('en', targetAnimal.labelKey).toLowerCase()}.`
     : level.prompt;
@@ -302,27 +367,52 @@ function ArcadeLevel({ level, band, hintsEnabled, onWin }: Props) {
   }));
 
   useEffect(() => {
-    if (level.template !== 'animalMatch' || !animalPrompt) return;
-    void speakKidPrompt(animalPrompt, { lang: 'en' });
-    return () => {
-      void stopSpeaking();
-    };
-  }, [level.id, animalCursor, animalPrompt, level.template]);
+    roundBusy.current = false;
+    roundHelpRef.current = false;
+    roundMissRef.current = false;
+    setRoundHelp(false);
+  }, [level.id, progress, animalCursor]);
+
+  const logRound = (id: string, correct: boolean) => {
+    wordLog.current.push({
+      id,
+      correct,
+      independent: correct && !roundHelpRef.current && !roundMissRef.current,
+      firstTry: correct && !roundHelpRef.current && !roundMissRef.current,
+    });
+    if (!correct) {
+      roundMissRef.current = true;
+      roundHelpRef.current = true;
+      setRoundHelp(true);
+    }
+  };
 
   const onColor = (c: string) => {
-    if (locked()) return;
+    if (locked() || roundBusy.current || !targetColor) return;
+    const wordId = colorName(targetColor, 'en');
     if (c === targetColor) {
+      roundBusy.current = true;
+      logRound(wordId, true);
       flash(true);
-      bumpProgress();
-    } else flash(false);
+      bumpProgress(Math.max(1, colorRounds.length));
+    } else {
+      logRound(wordId, false);
+      flash(false);
+    }
   };
 
   const onShape = (glyph: string) => {
-    if (locked()) return;
+    if (locked() || roundBusy.current || !targetToken) return;
+    const wordId = targetToken.labelKey.replace(/^shape\./, '');
     if (glyph === targetShape) {
+      roundBusy.current = true;
+      logRound(wordId, true);
       flash(true);
-      bumpProgress();
-    } else flash(false);
+      bumpProgress(Math.max(1, shapeRounds.length));
+    } else {
+      logRound(wordId, false);
+      flash(false);
+    }
   };
 
   const onSeq = (c: string) => {
@@ -372,20 +462,32 @@ function ArcadeLevel({ level, band, hintsEnabled, onWin }: Props) {
   };
 
   const onCount = (n: number) => {
-    if (locked()) return;
-    if (n === need) {
+    if (locked() || roundBusy.current || !countRound) return;
+    const wordId = COUNT_WORDS[countRound.count] ?? 'count';
+    if (n === countRound.count) {
+      roundBusy.current = true;
+      logRound(wordId, true);
       flash(true);
-      finish();
-    } else flash(false);
+      bumpProgress(Math.max(1, countRounds.length));
+    } else {
+      logRound(wordId, false);
+      flash(false);
+    }
   };
 
   const onSize = (item: (typeof sizeItems)[0]) => {
-    if (locked()) return;
-    const ok = level.findBigger ? item.isBiggest : item.isSmallest;
+    if (locked() || roundBusy.current) return;
+    const wordId = sizeAskBig ? 'big' : 'small';
+    const ok = sizeAskBig ? item.isBiggest : item.isSmallest;
     if (ok) {
+      roundBusy.current = true;
+      logRound(wordId, true);
       flash(true);
       bumpProgress();
-    } else flash(false);
+    } else {
+      logRound(wordId, false);
+      flash(false);
+    }
   };
 
   const onPattern = (c: string) => {
@@ -429,10 +531,13 @@ function ArcadeLevel({ level, band, hintsEnabled, onWin }: Props) {
     if (emoji === targetAnimal.emoji) {
       animalBusy.current = true;
       flash(true);
+      const pickedIndex = animalOptions.findIndex((animal) => animal.emoji === emoji);
+      const followed = animalOptions.length > 0 && pickedIndex === animalCursor % animalOptions.length;
       wordLog.current.push({
         id: wordId,
-        independent: !animalHelpUsed.current,
-        firstTry: !animalMissed.current && !animalHelpUsed.current,
+        correct: true,
+        independent: !animalHelpUsed.current && !followed,
+        firstTry: !animalMissed.current && !animalHelpUsed.current && !followed,
       });
       animalHelpUsed.current = false;
       animalMissed.current = false;
@@ -446,6 +551,12 @@ function ArcadeLevel({ level, band, hintsEnabled, onWin }: Props) {
       animalMissed.current = true;
       animalHelpUsed.current = true;
       setAnimalHelp(true);
+      wordLog.current.push({
+        id: wordId,
+        correct: false,
+        independent: false,
+        firstTry: false,
+      });
       flash(false);
       const name = tFor('en', targetAnimal.labelKey);
       void speakKidPrompt(`${name}. This is a ${name.toLowerCase()}.`, { lang: 'en', slow: true });
@@ -482,11 +593,48 @@ function ArcadeLevel({ level, band, hintsEnabled, onWin }: Props) {
   const softProgress = band === '3-5';
   const animalSize = band === '3-5' ? Math.max(size, 104) : size;
   const memoryPairs = Math.max(1, memoryCards.length / 2);
-  const singleShot =
-    level.template === 'quickFind' || level.template === 'oddOneOut' || level.template === 'countCollect';
-  const goal = level.template === 'memory' ? memoryPairs : level.template === 'animalMatch' ? animalGoal : singleShot ? 1 : need;
+  const singleShot = level.template === 'quickFind' || level.template === 'oddOneOut';
+  const goal =
+    level.template === 'memory'
+      ? memoryPairs
+      : level.template === 'animalMatch'
+        ? animalGoal
+        : level.template === 'countCollect'
+          ? Math.max(1, countRounds.length)
+          : level.template === 'colorMatch'
+            ? Math.max(1, colorRounds.length)
+            : level.template === 'shapeSort'
+              ? Math.max(1, shapeRounds.length)
+              : singleShot
+                ? 1
+                : need;
   const shownProgress = level.template === 'memory' ? memoryMatched.length / 2 : progress;
-  const spokenPrompt = level.template === 'animalMatch' ? animalPrompt : level.prompt;
+  const shapeWord = targetToken ? tFor('en', targetToken.labelKey).toLowerCase() : 'shape';
+  const spokenPrompt =
+    level.template === 'animalMatch'
+      ? animalPrompt
+      : level.template === 'colorMatch'
+        ? `Find the ${colorName(targetColor, 'en')}.`
+        : level.template === 'shapeSort'
+          ? `Find the ${shapeWord}.`
+          : level.template === 'countCollect'
+            ? 'How many?'
+            : level.template === 'sizeCompare'
+              ? sizeAskBig
+                ? 'Find the big one.'
+                : 'Find the small one.'
+              : level.template === 'sequence'
+                ? 'What comes next?'
+                : level.prompt;
+  const speakEnglish = ENGLISH_TEMPLATES.has(level.template);
+
+  useEffect(() => {
+    if (!speakEnglish) return;
+    void speakKidPrompt(spokenPrompt, { lang: 'en' });
+    return () => {
+      void stopSpeaking();
+    };
+  }, [level.id, spokenPrompt, speakEnglish, progress, animalCursor]);
 
   return (
     <Animated.View
@@ -507,7 +655,7 @@ function ArcadeLevel({ level, band, hintsEnabled, onWin }: Props) {
       <Animated.Text entering={FadeIn} style={[styles.prompt, softProgress && styles.promptSoft]}>
         {spokenPrompt}
       </Animated.Text>
-      <ListenBar text={spokenPrompt} lang={level.template === 'animalMatch' ? 'en' : undefined} />
+      <ListenBar text={spokenPrompt} lang={speakEnglish ? 'en' : undefined} />
 
       {level.timerSec ? (
         <View style={styles.timerPill}>
@@ -543,13 +691,17 @@ function ArcadeLevel({ level, band, hintsEnabled, onWin }: Props) {
 
       {level.template === 'colorMatch' ? (
         <View style={styles.grid}>
-          <Text style={styles.targetHint}>{t('level.target')}</Text>
-          <View
-            style={[
-              styles.swatch,
-              { backgroundColor: targetColor, width: size * 0.72, height: size * 0.72, alignSelf: 'center', marginBottom: 18 },
-            ]}
-          />
+          {roundHelp ? (
+            <View
+              style={[
+                styles.swatch,
+                { backgroundColor: targetColor, width: size * 0.72, height: size * 0.72, alignSelf: 'center', marginBottom: 8 },
+              ]}
+            />
+          ) : null}
+          {roundHelp && hintsEnabled ? (
+            <Text style={styles.targetHint}>{colorName(targetColor, 'tr')}</Text>
+          ) : null}
           <View style={styles.row}>
             {colorOptions.map((c) => (
               <Pressable
@@ -561,29 +713,42 @@ function ArcadeLevel({ level, band, hintsEnabled, onWin }: Props) {
               />
             ))}
           </View>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              roundHelpRef.current = true;
+              setRoundHelp(true);
+              void speakKidPrompt(spokenPrompt, { lang: 'en', slow: true });
+            }}
+            style={styles.helpBtn}
+          >
+            <Text style={styles.helpText}>{t('level.help')}</Text>
+          </Pressable>
         </View>
       ) : null}
 
       {level.template === 'shapeSort' ? (
         <View style={styles.grid}>
-          <View style={styles.targetCard}>
-            <Text style={styles.shapeTextBig}>{targetShape}</Text>
-            {showLabels && targetToken ? (
-              <Text style={styles.targetHint}>{targetToken.label}</Text>
-            ) : null}
-          </View>
+          {roundHelp && targetToken ? (
+            <View style={styles.targetCard}>
+              <Text style={styles.shapeTextBig}>{targetToken.glyph}</Text>
+              {hintsEnabled ? (
+                <Text style={styles.targetHint}>{tFor('tr', targetToken.labelKey)}</Text>
+              ) : null}
+            </View>
+          ) : null}
           <View style={styles.row}>
             {shapeOptions.map((s, i) => {
               const fill = level.colors[i % level.colors.length];
               return (
                 <BouncePress
-                  key={s.glyph}
+                  key={`${progress}-${s.glyph}`}
                   onPress={() => onShape(s.glyph)}
                   style={[
                     styles.shapeBtn,
                     {
                       width: size,
-                      height: size + (showLabels ? 22 : 0),
+                      height: size,
                       minHeight: 64,
                       backgroundColor: fill,
                       borderColor: 'rgba(255,255,255,0.65)',
@@ -591,13 +756,21 @@ function ArcadeLevel({ level, band, hintsEnabled, onWin }: Props) {
                   ]}
                 >
                   <Text style={[styles.shapeText, { color: colors.white }]}>{s.glyph}</Text>
-                  {showLabels ? (
-                    <Text style={[styles.shapeLabel, { color: colors.white }]}>{s.label}</Text>
-                  ) : null}
                 </BouncePress>
               );
             })}
           </View>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              roundHelpRef.current = true;
+              setRoundHelp(true);
+              void speakKidPrompt(spokenPrompt, { lang: 'en', slow: true });
+            }}
+            style={styles.helpBtn}
+          >
+            <Text style={styles.helpText}>{t('level.help')}</Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -653,22 +826,40 @@ function ArcadeLevel({ level, band, hintsEnabled, onWin }: Props) {
         </View>
       ) : null}
 
-      {level.template === 'countCollect' ? (
+      {level.template === 'countCollect' && countRound ? (
         <View style={styles.grid}>
-          <Text style={styles.targetHint}>{t('level.pickCount', { n: need })}</Text>
-          <View style={styles.row}>
-            {[1, 2, 3, 4, 5]
-              .slice(0, band === '3-5' ? Math.max(3, need + 1) : Math.max(4, need + 1))
-              .map((n) => (
-                <BouncePress
-                  key={n}
-                  onPress={() => onCount(n)}
-                  style={[styles.countBtn, { width: size, height: size }]}
-                >
-                  <Text style={styles.countText}>{n}</Text>
-                </BouncePress>
-              ))}
+          <View style={[styles.row, { marginBottom: 16 }]}>
+            {Array.from({ length: countRound.count }, (_, i) => (
+              <Text key={`${progress}-${i}`} style={styles.countObject}>
+                {countRound.emoji}
+              </Text>
+            ))}
           </View>
+          {roundHelp && hintsEnabled ? (
+            <Text style={styles.targetHint}>{COUNT_TR[countRound.count]}</Text>
+          ) : null}
+          <View style={styles.row}>
+            {countRound.choices.map((n) => (
+              <BouncePress
+                key={`${progress}-${n}`}
+                onPress={() => onCount(n)}
+                style={[styles.countBtn, { width: size, height: size }]}
+              >
+                <Text style={styles.countText}>{n}</Text>
+              </BouncePress>
+            ))}
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              roundHelpRef.current = true;
+              setRoundHelp(true);
+              void speakKidPrompt(spokenPrompt, { lang: 'en', slow: true });
+            }}
+            style={styles.helpBtn}
+          >
+            <Text style={styles.helpText}>{t('level.help')}</Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -1044,6 +1235,7 @@ const styles = StyleSheet.create({
     minHeight: 64,
   },
   countText: { fontSize: 28, fontWeight: '900', color: colors.forestDeep },
+  countObject: { fontSize: 40, marginHorizontal: 4 },
   binRow: { flexDirection: 'row', justifyContent: 'center', gap: 10, flexWrap: 'wrap' },
   bin: {
     width: 96,

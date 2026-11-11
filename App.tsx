@@ -13,6 +13,8 @@ import { PlayRoomScreen } from './src/screens/PlayRoomScreen';
 import { PremiumScreen } from './src/screens/PremiumScreen';
 import { PrivacyScreen } from './src/screens/PrivacyScreen';
 import { ProfileSetupScreen } from './src/screens/ProfileSetupScreen';
+import { ReviewScreen } from './src/screens/ReviewScreen';
+import { SaveRecoveryScreen } from './src/screens/SaveRecoveryScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { ShopScreen } from './src/screens/ShopScreen';
 import { WordAlbumScreen } from './src/screens/WordAlbumScreen';
@@ -35,7 +37,7 @@ const navTheme = {
 };
 
 function RootNav() {
-  const { ready, activeProfile, languageChosen } = useGame();
+  const { ready, activeProfile, languageChosen, saveBlocked } = useGame();
   const t = useT();
 
   if (!ready) {
@@ -72,6 +74,8 @@ function RootNav() {
     );
   }
 
+  if (saveBlocked) return <SaveRecoveryScreen />;
+
   const initialRouteName = !languageChosen
     ? 'LanguageGate'
     : activeProfile == null
@@ -98,6 +102,7 @@ function RootNav() {
       <Stack.Screen name="Settings" component={SettingsScreen} options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="Privacy" component={PrivacyScreen} options={{ animation: 'fade' }} />
       <Stack.Screen name="WordAlbum" component={WordAlbumScreen} options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="Review" component={ReviewScreen} options={{ animation: 'fade' }} />
     </Stack.Navigator>
   );
 }

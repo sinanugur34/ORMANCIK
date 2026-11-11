@@ -8,16 +8,20 @@ import React, {
   useRef,
   useState,
 } from 'react';
+import { AppState } from 'react-native';
 import { setVoiceNarrationEnabled } from '../audio/speakPrompt';
 import { COSMETICS } from '../data/cosmetics';
 import { TOTAL_LEVELS } from '../data/islands';
 import { isDeviceTurkish } from '../i18n/deviceLocale';
 import { setLanguage as setI18nLanguage, t, type Language } from '../i18n';
+import { CURRICULUM_VERSION, migrateCurriculum } from '../data/curriculum';
 import { applyAttempt, type EnglishLevel, type WordAttempt, type WordStat } from '../data/learning';
 import { ageToBand, AgeBand } from '../theme/colors';
 
 const STORAGE_KEY = 'ormancik-v1';
 const BACKUP_KEY = 'ormancik-v1-backup';
+/** Unreadable save kept aside before a grown-up starts a new one. */
+const QUARANTINE_KEY = 'ormancik-v1-quarantine';
 /** Legacy key from Tiny Grove branding — migrated once into STORAGE_KEY. */
 const LEGACY_STORAGE_KEY = 'tiny-grove-v1';
 const PARENT_SESSION_MS = 5 * 60 * 1000;
@@ -51,6 +55,12 @@ export type ChildProfile = {
   /** Levels before a gentle break prompt. 0 disables it. */
   sessionLimit: number;
   levelStars: Record<string, 1 | 2 | 3>;
+  /** 2 = the English friends unit owns levels 1–8. */
+  contentVersion: number;
+  /** Old player still needs to be shown the new English unit. */
+  friendsIntro: boolean;
+  /** Previous activity clears for levels 1–8. Not English evidence. */
+  legacyLevelIds: number[];
 };
 
 type DevicePersisted = {
@@ -138,10 +148,24 @@ type GameContextValue = {
   addCoinsToProfile: (profileId: string, n: number) => void;
   parentPinSet: boolean;
   parentUnlockedUntil: number;
-  saveWarning: boolean;
+  /** read: the file could not be read. write: a later save failed. */
+  saveIssue: 'read' | 'write' | null;
+  /** True while a corrupt file is held and must not be overwritten. */
+  saveBlocked: boolean;
+  backupAvailable: boolean;
   setParentPin: (pin: string) => boolean;
   verifyParentPin: (pin: string) => 'ok' | 'wrong' | 'locked';
   unlockParent: () => void;
+  /** Hides the grown-up area before the timer ends. */
+  lockParent: () => void;
+  /** True only while the grown-up timer is still running. Updates when it ends. */
+  parentOpen: boolean;
+  friendsIntro: boolean;
+  dismissFriendsIntro: () => void;
+  retrySaveLoad: () => Promise<void>;
+  restoreBackup: () => Promise<boolean>;
+  /** Keeps the unreadable file aside, then allows a new save. */
+  startNewSave: () => Promise<boolean>;
 };
 
 const starterOwned = COSMETICS.filter((c) => c.starter).map((c) => c.id);
@@ -228,6 +252,32 @@ function makeProfile(name: string, age: number, progress?: Partial<ChildProfile>
     clearedLevelIds: progress?.clearedLevelIds ?? [],
     highestUnlocked: progress?.highestUnlocked ?? FREE_UNLOCK_COUNT,
     ...learningDefaults(progress),
+    contentVersion: progress?.contentVersion ?? CURRICULUM_VERSION,
+    friendsIntro: progress?.friendsIntro ?? false,
+    legacyLevelIds: progress?.legacyLevelIds ?? [],
+  };
+}
+
+function profileFromSaved(raw: Partial<ChildProfile> & { name?: string; age?: number }): ChildProfile {
+  const curriculum = migrateCurriculum({
+    clearedLevelIds: raw.clearedLevelIds,
+    levelStars: raw.levelStars,
+    wordProgress: raw.wordProgress,
+    contentVersion: raw.contentVersion,
+    friendsIntro: raw.friendsIntro,
+    legacyLevelIds: raw.legacyLevelIds,
+  });
+  return {
+    ...makeProfile(raw.name || t('common.player'), raw.age ?? 5, {
+      ...raw,
+      clearedLevelIds: curriculum.clearedLevelIds,
+      levelStars: curriculum.levelStars,
+      wordProgress: raw.wordProgress,
+    }),
+    id: raw.id || newProfileId(),
+    contentVersion: curriculum.contentVersion,
+    friendsIntro: curriculum.friendsIntro,
+    legacyLevelIds: curriculum.legacyLevelIds,
   };
 }
 
@@ -235,10 +285,7 @@ function migrateFromRaw(raw: string): DevicePersisted {
   const parsed = JSON.parse(raw) as LegacyPersisted;
 
   if (Array.isArray(parsed.profiles) && parsed.profiles.length > 0) {
-    const profiles = parsed.profiles.slice(0, MAX_PROFILES).map((p) => ({
-      ...makeProfile(p.name || t('common.player'), p.age ?? 5, p),
-      id: p.id || newProfileId(),
-    }));
+    const profiles = parsed.profiles.slice(0, MAX_PROFILES).map((p) => profileFromSaved(p));
     const activeProfileId =
       profiles.find((p) => p.id === parsed.activeProfileId)?.id ?? profiles[0]!.id;
     return {
@@ -255,7 +302,9 @@ function migrateFromRaw(raw: string): DevicePersisted {
 
   // Legacy single-age → one profile named "Oyuncu" / "Player"
   if (parsed.childAge != null && typeof parsed.childAge === 'number') {
-    const profile = makeProfile(t('common.player'), parsed.childAge, {
+    const profile = profileFromSaved({
+      name: t('common.player'),
+      age: parsed.childAge,
       coins: parsed.coins,
       ownedCosmeticIds: parsed.ownedCosmeticIds,
       equipped: parsed.equipped as Equipped | undefined,
@@ -302,68 +351,119 @@ const GameContext = createContext<GameContextValue | null>(null);
 export function GameProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<DevicePersisted>(defaultDevice);
   const [ready, setReady] = useState(false);
-  const [saveWarning, setSaveWarning] = useState(false);
+  const [saveIssue, setSaveIssue] = useState<'read' | 'write' | null>(null);
+  const [saveBlocked, setSaveBlocked] = useState(false);
+  const [heldSave, setHeldSave] = useState<{ mainRaw: string | null; backupRaw: string | null }>({
+    mainRaw: null,
+    backupRaw: null,
+  });
   const [sittingCount, setSittingCount] = useState(0);
+  const [parentOpen, setParentOpen] = useState(false);
   const stateRef = useRef(state);
   const allowSave = useRef(false);
   const pinFails = useRef(0);
   const pinLockedUntil = useRef(0);
+  const heldSaveRef = useRef(heldSave);
   stateRef.current = state;
+  heldSaveRef.current = heldSave;
 
   const commit = useCallback((next: DevicePersisted) => {
     stateRef.current = next;
     setState(next);
   }, []);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        let raw = await AsyncStorage.getItem(STORAGE_KEY);
-        if (!raw) {
-          const legacy = await AsyncStorage.getItem(LEGACY_STORAGE_KEY);
-          if (legacy) {
-            raw = legacy;
-            await AsyncStorage.setItem(STORAGE_KEY, legacy);
-            await AsyncStorage.removeItem(LEGACY_STORAGE_KEY);
-          }
-        }
-        if (raw) {
-          let migrated: DevicePersisted;
-          try {
-            migrated = migrateFromRaw(raw);
-          } catch {
-            const backup = await AsyncStorage.getItem(BACKUP_KEY);
-            if (!backup) throw new Error('save unreadable');
-            migrated = migrateFromRaw(backup);
-          }
-          setI18nLanguage(migrated.language);
-          allowSave.current = true;
-          setState(migrated);
-        } else {
-          const fresh = bootstrapFreshInstall();
-          setI18nLanguage(fresh.language);
-          allowSave.current = true;
-          setState(fresh);
-        }
-      } catch {
-        const fresh = bootstrapFreshInstall();
-        setI18nLanguage(fresh.language);
-        allowSave.current = false;
-        setSaveWarning(true);
-        setState(fresh);
-      } finally {
-        setReady(true);
-      }
-    })();
+  const acceptLoaded = useCallback((migrated: DevicePersisted) => {
+    setI18nLanguage(migrated.language);
+    allowSave.current = true;
+    setSaveBlocked(false);
+    setSaveIssue(null);
+    setHeldSave({ mainRaw: null, backupRaw: null });
+    stateRef.current = migrated;
+    setState(migrated);
   }, []);
+
+  const holdUnreadable = useCallback((mainRaw: string | null, backupRaw: string | null) => {
+    const fresh = bootstrapFreshInstall();
+    setI18nLanguage(fresh.language);
+    allowSave.current = false;
+    setSaveIssue('read');
+    setSaveBlocked(true);
+    setHeldSave({ mainRaw, backupRaw });
+    stateRef.current = fresh;
+    setState(fresh);
+  }, []);
+
+  const loadFromDisk = useCallback(async () => {
+    try {
+      let raw = await AsyncStorage.getItem(STORAGE_KEY);
+      if (!raw) {
+        const legacy = await AsyncStorage.getItem(LEGACY_STORAGE_KEY);
+        if (legacy) {
+          raw = legacy;
+          await AsyncStorage.setItem(STORAGE_KEY, legacy);
+          await AsyncStorage.removeItem(LEGACY_STORAGE_KEY);
+        }
+      }
+      if (!raw) {
+        acceptLoaded(bootstrapFreshInstall());
+        return;
+      }
+      try {
+        acceptLoaded(migrateFromRaw(raw));
+        return;
+      } catch {
+        const backup = await AsyncStorage.getItem(BACKUP_KEY);
+        if (backup) {
+          try {
+            acceptLoaded(migrateFromRaw(backup));
+            return;
+          } catch {
+            holdUnreadable(raw, backup);
+            return;
+          }
+        }
+        holdUnreadable(raw, null);
+      }
+    } catch {
+      holdUnreadable(null, null);
+    }
+  }, [acceptLoaded, holdUnreadable]);
+
+  useEffect(() => {
+    let cancel = false;
+    (async () => {
+      await loadFromDisk();
+      if (!cancel) setReady(true);
+    })();
+    return () => {
+      cancel = true;
+    };
+  }, [loadFromDisk]);
 
   useEffect(() => {
     if (!ready || !allowSave.current) return;
     const payload = JSON.stringify(state);
     AsyncStorage.setItem(STORAGE_KEY, payload)
       .then(() => AsyncStorage.setItem(BACKUP_KEY, payload))
-      .catch(() => setSaveWarning(true));
+      .then(() => setSaveIssue((current) => (current === 'write' ? null : current)))
+      .catch(() => setSaveIssue('write'));
   }, [state, ready]);
+
+  useEffect(() => {
+    const sync = () => {
+      const open = stateRef.current.parentUnlockedUntil > Date.now();
+      setParentOpen((current) => (current === open ? current : open));
+    };
+    sync();
+    const id = setInterval(sync, 1000);
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') sync();
+    });
+    return () => {
+      clearInterval(id);
+      sub.remove();
+    };
+  }, [state.parentUnlockedUntil]);
 
   useEffect(() => {
     setVoiceNarrationEnabled(state.voiceEnabled);
@@ -389,6 +489,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       profiles: [...s.profiles, profile],
       activeProfileId: profile.id,
     });
+    setSittingCount(0);
     return profile;
   }, [commit]);
 
@@ -396,6 +497,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     const s = stateRef.current;
     if (!s.profiles.some((p) => p.id === id)) return false;
     commit({ ...s, activeProfileId: id });
+    // Each child has their own sitting. Switching starts the break count again.
+    setSittingCount(0);
     return true;
   }, [commit]);
 
@@ -512,6 +615,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           highestUnlocked: Math.max(FREE_UNLOCK_COUNT, nextUnlock, p.highestUnlocked),
           coins: p.coins + awarded,
           levelStars,
+          friendsIntro: levelId <= 8 ? false : p.friendsIntro,
         };
       }),
     );
@@ -550,6 +654,53 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const dismissSitting = useCallback(() => {
     setSittingCount(0);
   }, []);
+
+  const dismissFriendsIntro = useCallback(() => {
+    commit(patchActive(stateRef.current, (p) => ({ ...p, friendsIntro: false })));
+  }, [commit]);
+
+  const lockParent = useCallback(() => {
+    commit({ ...stateRef.current, parentUnlockedUntil: 0 });
+  }, [commit]);
+
+  const quarantineHeld = useCallback(async (): Promise<boolean> => {
+    const raw = heldSaveRef.current.mainRaw;
+    if (!raw) return true;
+    try {
+      await AsyncStorage.setItem(QUARANTINE_KEY, raw);
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  const retrySaveLoad = useCallback(async () => {
+    await loadFromDisk();
+  }, [loadFromDisk]);
+
+  const restoreBackup = useCallback(async (): Promise<boolean> => {
+    const backup = heldSaveRef.current.backupRaw;
+    if (!backup) return false;
+    let migrated: DevicePersisted;
+    try {
+      migrated = migrateFromRaw(backup);
+    } catch {
+      return false;
+    }
+    const kept = await quarantineHeld();
+    if (!kept) return false;
+    acceptLoaded(migrated);
+    return true;
+  }, [acceptLoaded, quarantineHeld]);
+
+  const startNewSave = useCallback(async (): Promise<boolean> => {
+    const kept = await quarantineHeld();
+    if (!kept) return false;
+    const pin = stateRef.current.parentPin;
+    const fresh = { ...bootstrapFreshInstall(), parentPin: pin };
+    acceptLoaded(fresh);
+    return true;
+  }, [acceptLoaded, quarantineHeld]);
 
   const setParentPin = useCallback((pin: string) => {
     if (!/^\d{4}$/.test(pin)) return false;
@@ -626,9 +777,13 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       wordProgress: activeProfile?.wordProgress ?? {},
       sessionLimit: activeProfile?.sessionLimit ?? 8,
       sittingCount,
-      saveWarning,
+      saveIssue,
+      saveBlocked,
+      backupAvailable: heldSave.backupRaw != null,
       parentPinSet: state.parentPin != null,
       parentUnlockedUntil: state.parentUnlockedUntil,
+      parentOpen,
+      friendsIntro: activeProfile?.friendsIntro ?? false,
       createProfile,
       switchProfile,
       deleteProfile,
@@ -648,12 +803,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       isLevelUnlocked,
       resetProgress,
       dismissSitting,
+      dismissFriendsIntro,
       setHintsEnabled,
       setEnglishLevel,
       setSessionLimit,
       setParentPin,
       verifyParentPin,
       unlockParent,
+      lockParent,
+      retrySaveLoad,
+      restoreBackup,
+      startNewSave,
     }),
     [
       state.profiles,
@@ -668,7 +828,10 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       activeProfile,
       ageBand,
       sittingCount,
-      saveWarning,
+      saveIssue,
+      saveBlocked,
+      heldSave.backupRaw,
+      parentOpen,
       createProfile,
       switchProfile,
       deleteProfile,
@@ -688,12 +851,17 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       isLevelUnlocked,
       resetProgress,
       dismissSitting,
+      dismissFriendsIntro,
       setHintsEnabled,
       setEnglishLevel,
       setSessionLimit,
       setParentPin,
       verifyParentPin,
       unlockParent,
+      lockParent,
+      retrySaveLoad,
+      restoreBackup,
+      startNewSave,
     ],
   );
 

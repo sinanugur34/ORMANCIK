@@ -21,8 +21,8 @@ type GateKind = 'buy' | 'restore' | 'view' | null;
 
 export function PremiumScreen({ navigation }: Props) {
   const t = useT();
-  const { premium, setPremium, addCoinsToProfile, ownCosmetic, activeProfileId, parentUnlockedUntil } = useGame();
-  const grown = parentUnlockedUntil > Date.now();
+  const { premium, setPremium, addCoinsToProfile, ownCosmetic, activeProfileId, parentOpen, lockParent } = useGame();
+  const grown = parentOpen;
   const [gate, setGate] = useState<GateKind>(null);
   const [busy, setBusy] = useState(false);
   const [banner, setBanner] = useState<{ message: string; tone: 'ok' | 'error' | 'info' | 'warn' } | null>(
@@ -119,6 +119,13 @@ export function PremiumScreen({ navigation }: Props) {
 
             {grown ? (
             <FadeInView>
+              <PrimaryButton
+                label={t('shop.leaveGrownups')}
+                tone="sky"
+                large={false}
+                onPress={lockParent}
+                style={{ marginBottom: 12 }}
+              />
               <Text style={styles.eyebrow}>{t('brand.name')}</Text>
               <Text style={styles.title}>{t('premium.title')}</Text>
               <Text style={styles.sub}>{t('premium.sub')}</Text>

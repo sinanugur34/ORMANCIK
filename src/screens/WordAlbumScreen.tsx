@@ -1,10 +1,12 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React from 'react';
+import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { speakKidPrompt } from '../audio/speakPrompt';
 import { AnimatedBackground } from '../components/AnimatedBackground';
 import { BouncePress } from '../components/Motion';
-import { FRIENDS_WORD_IDS } from '../data/friendsUnit';
+import { PrimaryButton } from '../components/PrimaryButton';
+import { albumWord, listAlbumWords } from '../data/friendsUnit';
 import { isDue } from '../data/learning';
 import { useT } from '../i18n';
 import { RootStackParamList } from '../navigation/types';
@@ -13,18 +15,15 @@ import { colors } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'WordAlbum'>;
 
-const LABELS: Record<string, { en: string; tr: string; emoji: string }> = {
-  hello: { en: 'hello', tr: 'merhaba', emoji: '🙋' },
-  bye: { en: 'bye', tr: 'hoşça kal', emoji: '👋' },
-  cat: { en: 'cat', tr: 'kedi', emoji: '🐱' },
-  dog: { en: 'dog', tr: 'köpek', emoji: '🐶' },
-  rabbit: { en: 'rabbit', tr: 'tavşan', emoji: '🐰' },
-};
-
 export function WordAlbumScreen({ navigation }: Props) {
   const t = useT();
   const { wordProgress, language } = useGame();
-  const ids = Array.from(new Set([...FRIENDS_WORD_IDS, ...Object.keys(wordProgress)]));
+  const catalog = useMemo(() => listAlbumWords(), []);
+  const ids = Array.from(new Set([...catalog.map((word) => word.id), ...Object.keys(wordProgress)]));
+  const dueIds = ids.filter((id) => {
+    const stat = wordProgress[id];
+    return stat != null && isDue(stat);
+  });
 
   return (
     <AnimatedBackground>
@@ -37,10 +36,18 @@ export function WordAlbumScreen({ navigation }: Props) {
         </View>
         <ScrollView contentContainerStyle={styles.list}>
           <Text style={styles.lead}>{t('album.lead')}</Text>
+          <Text style={styles.note}>{t('album.attemptsNote')}</Text>
+          {dueIds.length > 0 ? (
+            <PrimaryButton
+              label={t('album.practiceDue')}
+              onPress={() => navigation.navigate('Review', { wordIds: dueIds })}
+            />
+          ) : null}
           {ids.map((id) => {
             const stat = wordProgress[id];
-            const label = LABELS[id];
+            const label = catalog.find((word) => word.id === id) ?? albumWord(id);
             const name = label ? (language === 'tr' ? `${label.en} · ${label.tr}` : label.en) : id;
+            const due = stat != null && isDue(stat);
             return (
               <View key={id} style={styles.card}>
                 <Text style={styles.word}>
@@ -53,11 +60,30 @@ export function WordAlbumScreen({ navigation }: Props) {
                       hinted: stat.hinted,
                       attempts: stat.attempts,
                     })}
-                    {isDue(stat) ? ` · ${t('album.due')}` : ''}
+                    {due ? ` · ${t('album.due')}` : ''}
                   </Text>
                 ) : (
                   <Text style={styles.meta}>{t('album.empty')}</Text>
                 )}
+                <View style={styles.actions}>
+                  <BouncePress
+                    style={styles.action}
+                    onPress={() => {
+                      const spoken = label?.en ?? id;
+                      void speakKidPrompt(spoken, { lang: 'en', clipId: label?.clipId });
+                    }}
+                  >
+                    <Text style={styles.actionText}>{t('album.listen')}</Text>
+                  </BouncePress>
+                  {stat ? (
+                    <BouncePress
+                      style={styles.action}
+                      onPress={() => navigation.navigate('Review', { wordIds: [id] })}
+                    >
+                      <Text style={styles.actionText}>{t('album.practice')}</Text>
+                    </BouncePress>
+                  ) : null}
+                </View>
               </View>
             );
           })}
@@ -79,8 +105,18 @@ const styles = StyleSheet.create({
   backText: { fontWeight: '800', color: colors.forestDeep },
   title: { fontSize: 22, fontWeight: '900', color: colors.forestDeep },
   list: { padding: 16, gap: 10, paddingBottom: 40 },
-  lead: { color: colors.muted, fontWeight: '600', marginBottom: 8 },
+  lead: { color: colors.muted, fontWeight: '600' },
+  note: { color: colors.forest, fontWeight: '700', marginBottom: 8 },
   card: { backgroundColor: colors.card, borderRadius: 18, padding: 14 },
   word: { fontSize: 18, fontWeight: '900', color: colors.forestDeep },
   meta: { marginTop: 4, color: colors.forest, fontWeight: '700' },
+  actions: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  action: {
+    minHeight: 44,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    backgroundColor: colors.white,
+    justifyContent: 'center',
+  },
+  actionText: { fontWeight: '800', color: colors.forestDeep },
 });

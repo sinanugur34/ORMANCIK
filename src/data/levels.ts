@@ -1,6 +1,6 @@
 import { getLanguage, tFor, type Language } from '../i18n';
 import { AgeBand, palette } from '../theme/colors';
-import { buildFriendsLevel, type LessonStep } from './friendsUnit';
+import { buildFriendsLevel, type FriendsLearning, type LessonStep } from './friendsUnit';
 import { islandForLevel, TOTAL_LEVELS } from './islands';
 
 export type LevelTemplate =
@@ -326,8 +326,13 @@ function promptFor(
   }
 }
 
-export function buildLevel(levelId: number, band: AgeBand, lang: Language = getLanguage()): LevelDef {
-  const scripted = buildFriendsLevel(levelId, band, lang);
+export function buildLevel(
+  levelId: number,
+  band: AgeBand,
+  lang: Language = getLanguage(),
+  learning?: FriendsLearning,
+): LevelDef {
+  const scripted = buildFriendsLevel(levelId, band, lang, learning);
   if (scripted) return scripted;
 
   const rng = mulberry32(levelId * 997 + band.charCodeAt(0) * 13);

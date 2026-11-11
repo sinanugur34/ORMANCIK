@@ -96,6 +96,7 @@ export function LessonPlay({ level, band, hintsEnabled, onWin }: Props) {
       setFeedback('good');
       words.current.push({
         id: step.wordId,
+        correct: true,
         independent: !helpUsed.current,
         firstTry: !missed.current && !helpUsed.current,
       });
@@ -104,6 +105,12 @@ export function LessonPlay({ level, band, hintsEnabled, onWin }: Props) {
     }
     missed.current = true;
     helpUsed.current = true;
+    words.current.push({
+      id: step.wordId,
+      correct: false,
+      independent: false,
+      firstTry: false,
+    });
     setMistakes((m) => m + 1);
     setFeedback('bad');
     setHelpOn(true);

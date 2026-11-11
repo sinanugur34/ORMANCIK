@@ -32,7 +32,9 @@ export function HomeScreen({ navigation }: Props) {
     sessionLimit,
     sittingCount,
     dismissSitting,
-    saveWarning,
+    saveIssue,
+    friendsIntro,
+    dismissFriendsIntro,
   } = useGame();
   const soft = ageBand === '3-5';
   const greetedId = useRef<string | null>(null);
@@ -98,8 +100,29 @@ export function HomeScreen({ navigation }: Props) {
             </View>
           </FadeInView>
 
-          {saveWarning ? (
-            <Text style={styles.breakBody}>{t('settings.saveWarning')}</Text>
+          {saveIssue === 'write' ? (
+            <Text style={styles.breakBody}>{t('settings.saveWriteWarning')}</Text>
+          ) : null}
+          {friendsIntro ? (
+            <FadeInView style={styles.breakCard}>
+              <Text style={styles.breakTitle}>{t('home.friendsTitle')}</Text>
+              <Text style={styles.breakBody}>{t('home.friendsBody')}</Text>
+              <PrimaryButton
+                label={t('home.friendsStart')}
+                onPress={() => {
+                  dismissFriendsIntro();
+                  navigation.navigate('Level', { levelId: nextLevel <= 8 ? nextLevel : 1 });
+                }}
+                style={{ marginTop: 12 }}
+              />
+              <PrimaryButton
+                label={t('home.friendsLater')}
+                tone="sky"
+                large={false}
+                onPress={dismissFriendsIntro}
+                style={{ marginTop: 8 }}
+              />
+            </FadeInView>
           ) : null}
           {sessionLimit > 0 && sittingCount >= sessionLimit ? (
             <FadeInView style={styles.breakCard}>

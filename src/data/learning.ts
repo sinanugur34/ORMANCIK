@@ -18,6 +18,11 @@ export type WordAttempt = {
   id: string;
   independent: boolean;
   firstTry: boolean;
+  /**
+   * False for a wrong entry. `attempts` counts every entry, including wrong ones.
+   * Independent and hinted count only correct entries.
+   */
+  correct: boolean;
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -33,16 +38,17 @@ export function applyAttempt(prev: WordStat | undefined, attempt: WordAttempt, n
     lastAt: 0,
     reviewAt: 0,
   };
+  const correct = attempt.correct !== false;
   return {
     ...base,
     id: attempt.id,
     skill: 'listen-recognize',
     attempts: base.attempts + 1,
-    independent: base.independent + (attempt.independent ? 1 : 0),
-    hinted: base.hinted + (attempt.independent ? 0 : 1),
-    firstTry: base.firstTry + (attempt.firstTry ? 1 : 0),
+    independent: base.independent + (correct && attempt.independent ? 1 : 0),
+    hinted: base.hinted + (correct && !attempt.independent ? 1 : 0),
+    firstTry: base.firstTry + (correct && attempt.firstTry ? 1 : 0),
     lastAt: now,
-    reviewAt: now + (attempt.independent ? 2 * DAY_MS : DAY_MS),
+    reviewAt: correct ? now + (attempt.independent ? 2 * DAY_MS : DAY_MS) : now,
   };
 }
 
