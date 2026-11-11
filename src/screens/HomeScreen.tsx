@@ -157,10 +157,10 @@ export function HomeScreen({ navigation }: Props) {
                 <View style={styles.stops}>
                   {stops.map((id) => {
                     const done = clearedLevelIds.includes(id);
-                    const now = id === nextLevel;
+                    const current = id === nextLevel && !done;
                     return (
-                      <View key={id} style={[styles.stop, now && styles.stopNow, done && styles.stopDone]}>
-                        <Text style={[styles.stopText, now && styles.stopTextNow]}>
+                      <View key={id} style={[styles.stop, current && styles.stopNow, done && styles.stopDone]}>
+                        <Text style={[styles.stopText, current && styles.stopTextNow]}>
                           {done ? '✓ ' : ''}
                           {id}
                         </Text>
@@ -216,6 +216,12 @@ export function HomeScreen({ navigation }: Props) {
                   tone="quiet"
                   large={false}
                   onPress={() => navigation.navigate('PlayRoom')}
+                />
+                <PrimaryButton
+                  label={t('home.shop')}
+                  tone="quiet"
+                  large={false}
+                  onPress={() => navigation.navigate('Shop')}
                 />
               </View>
             )}

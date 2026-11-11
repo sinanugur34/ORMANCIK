@@ -41,6 +41,7 @@ type Props = {
 
 export function LessonPlay({ level, band, hintsEnabled, onWin }: Props) {
   const t = useT();
+  const { width } = useWindowDimensions();
   const steps = level.lesson ?? [];
   const [index, setIndex] = useState(0);
   const [mistakes, setMistakes] = useState(0);
@@ -166,7 +167,6 @@ export function LessonPlay({ level, band, hintsEnabled, onWin }: Props) {
   if (!step) return null;
 
   const showPicture = step.kind === 'model' || helpOn;
-  const { width } = useWindowDimensions();
   const wide = width >= 700;
   const size = band === '3-5' ? (wide ? 156 : 124) : band === '6-8' ? (wide ? 128 : 100) : wide ? 116 : 92;
 
