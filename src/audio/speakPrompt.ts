@@ -51,6 +51,8 @@ const inflightSynth = new Map<string, Promise<string>>();
 let currentPlayer: AudioPlayer | null = null;
 let htmlAudio: HTMLAudioElement | null = null;
 let audioModeReady = false;
+/** Speech.stop() must finish before the next utterance, or it cancels that utterance. */
+let haltChain: Promise<void> = Promise.resolve();
 
 /**
  * Bumped by every new speak and by stopSpeaking.
@@ -102,7 +104,7 @@ export function getSelectedVoiceLabel(): string | null {
   return 'On-device + bundled English';
 }
 
-function haltPlayback(): void {
+function haltPlayers(): void {
   try {
     if (htmlAudio) {
       htmlAudio.pause();
@@ -123,17 +125,27 @@ function haltPlayback(): void {
   } catch {
     currentPlayer = null;
   }
+}
 
-  try {
-    void Speech.stop();
-  } catch {
-    // Speech may be unavailable on some web builds.
-  }
+function haltPlayback(): Promise<void> {
+  haltPlayers();
+  const pending = haltChain.then(async () => {
+    try {
+      await Speech.stop();
+    } catch {
+      // Speech may be unavailable on some web builds.
+    }
+  });
+  haltChain = pending.then(
+    () => undefined,
+    () => undefined,
+  );
+  return pending;
 }
 
 export async function stopSpeaking(): Promise<void> {
   generation += 1;
-  haltPlayback();
+  await haltPlayback();
 }
 
 async function ensureAudioMode(): Promise<void> {
@@ -356,7 +368,7 @@ export async function speakKidPrompt(text: string, options?: SpeakOptions): Prom
 
   const token = ++generation;
   lastInstructionAt = Date.now();
-  haltPlayback();
+  await haltPlayback();
   if (!stillCurrent(token)) return;
 
   const lang = options?.lang ?? getLanguage();

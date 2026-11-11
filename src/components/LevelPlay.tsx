@@ -67,6 +67,7 @@ function ArcadeLevel({ level, band, hintsEnabled, onWin }: Props) {
   const comparingMemory = useRef(false);
   const flippedRef = useRef<number[]>([]);
   const matchedRef = useRef<number[]>([]);
+  const animalBusy = useRef(false);
   const animalHelpUsed = useRef(false);
   const animalMissed = useRef(false);
   const wordLog = useRef<WordAttempt[]>([]);
@@ -78,6 +79,7 @@ function ArcadeLevel({ level, band, hintsEnabled, onWin }: Props) {
     comparingMemory.current = false;
     flippedRef.current = [];
     matchedRef.current = [];
+    animalBusy.current = false;
     animalHelpUsed.current = false;
     animalMissed.current = false;
     wordLog.current = [];
@@ -102,8 +104,8 @@ function ArcadeLevel({ level, band, hintsEnabled, onWin }: Props) {
   }, [level.id]);
 
   useEffect(() => {
-    const english = level.template === 'animalMatch';
-    void speakKidPrompt(level.prompt, english ? { lang: 'en' } : undefined);
+    if (level.template === 'animalMatch') return;
+    void speakKidPrompt(level.prompt);
     return () => {
       void stopSpeaking();
     };
@@ -300,9 +302,12 @@ function ArcadeLevel({ level, band, hintsEnabled, onWin }: Props) {
   }));
 
   useEffect(() => {
-    if (level.template !== 'animalMatch' || animalCursor === 0) return;
+    if (level.template !== 'animalMatch' || !animalPrompt) return;
     void speakKidPrompt(animalPrompt, { lang: 'en' });
-  }, [animalCursor, animalPrompt, level.template]);
+    return () => {
+      void stopSpeaking();
+    };
+  }, [level.id, animalCursor, animalPrompt, level.template]);
 
   const onColor = (c: string) => {
     if (locked()) return;
@@ -419,9 +424,10 @@ function ArcadeLevel({ level, band, hintsEnabled, onWin }: Props) {
   };
 
   const onAnimal = (emoji: string) => {
-    if (locked() || !targetAnimal) return;
+    if (locked() || animalBusy.current || !targetAnimal) return;
     const wordId = targetAnimal.labelKey.replace(/^animal\./, '');
     if (emoji === targetAnimal.emoji) {
+      animalBusy.current = true;
       flash(true);
       wordLog.current.push({
         id: wordId,
@@ -433,6 +439,9 @@ function ArcadeLevel({ level, band, hintsEnabled, onWin }: Props) {
       setAnimalHelp(false);
       setAnimalCursor((c) => c + 1);
       bumpProgress(animalGoal);
+      later(() => {
+        animalBusy.current = false;
+      }, 480);
     } else {
       animalMissed.current = true;
       animalHelpUsed.current = true;

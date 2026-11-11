@@ -86,7 +86,6 @@ export function LessonPlay({ level, band, hintsEnabled, onWin }: Props) {
   const onModelContinue = () => {
     if (settled.current || stepBusy.current || !step || step.kind !== 'model') return;
     stepBusy.current = true;
-    words.current.push({ id: step.wordId, independent: false, firstTry: false });
     advance();
   };
 

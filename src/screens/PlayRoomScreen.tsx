@@ -32,7 +32,7 @@ export function PlayRoomScreen({ navigation }: Props) {
   const fx = equipped.fx ? COSMETICS.find((c) => c.id === equipped.fx) : null;
   const roomArt = ROOM_ART[equipped.room] ?? ROOM_ART['room-meadow'];
   const treehouse = equipped.room === 'room-treehouse';
-  const [hatOn, setHatOn] = useState(equipped.outfit === 'outfit-leaf');
+  const [hatOn, setHatOn] = useState(false);
 
   useEffect(() => {
     void speakKidPrompt('Put on the hat.', { lang: 'en', clipId: 'room-hat' });
@@ -90,7 +90,7 @@ export function PlayRoomScreen({ navigation }: Props) {
                     key={c.id}
                     onPress={() => {
                       equipCosmetic(c.id);
-                      if (c.id === 'outfit-leaf') setHatOn(true);
+                      setHatOn(c.id === 'outfit-leaf');
                     }}
                     style={[styles.chip, equipped.outfit === c.id && styles.chipOn]}
                   >

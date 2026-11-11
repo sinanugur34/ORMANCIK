@@ -443,8 +443,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, [commit]);
 
   const setPremium = useCallback((v: boolean) => {
-    setState((s) => ({ ...s, premium: v }));
-  }, []);
+    commit({ ...stateRef.current, premium: v });
+  }, [commit]);
 
   const setVoiceEnabled = useCallback((v: boolean) => {
     setState((s) => ({ ...s, voiceEnabled: v }));
