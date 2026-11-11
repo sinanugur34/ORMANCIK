@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { migrateCurriculum } from '../src/data/curriculum';
-import { buildFriendsLevel, buildReviewLevel } from '../src/data/friendsUnit';
+import { albumWord, buildFriendsLevel, buildReviewLevel } from '../src/data/friendsUnit';
 import { applyAttempt, mergeWordProgress } from '../src/data/learning';
 import { buildRounds, orderByNeed, shapePixelSize } from '../src/data/rounds';
 
@@ -136,6 +136,10 @@ assert.equal(five?.lesson?.[0]?.count, 5);
 assert.equal(five?.lesson?.[0]?.emoji, '🌟');
 assert.ok(fiveChoices.every((choice) => choice.emoji === '🌟' && (choice.count ?? 0) >= 1));
 assert.equal(new Set(fiveChoices.map((choice) => choice.count)).size, fiveChoices.length);
+assert.equal(albumWord('two')?.count, 2);
+assert.equal(albumWord('five')?.count, 5);
+assert.equal(albumWord('two')?.emoji, '🍎');
+assert.notEqual(albumWord('one')?.count, albumWord('five')?.count);
 
 const merged = mergeWordProgress({
   red: {

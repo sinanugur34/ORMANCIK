@@ -62,8 +62,23 @@ export function WordAlbumScreen({ navigation }: Props) {
                 <View style={styles.wordRow}>
                   {label?.swatch ? (
                     <View style={[styles.swatch, { backgroundColor: label.swatch }]} />
+                  ) : label?.count != null ? (
+                    <View style={styles.cluster}>
+                      {Array.from({ length: label.count }, (_, i) => (
+                        <Text key={i} style={styles.piece}>
+                          {label.emoji}
+                        </Text>
+                      ))}
+                    </View>
                   ) : (
-                    <Text style={styles.emoji}>{label?.emoji || '★'}</Text>
+                    <Text
+                      style={[
+                        styles.emoji,
+                        label?.scale != null ? { fontSize: Math.round(22 * label.scale), width: 48 } : null,
+                      ]}
+                    >
+                      {label?.emoji || '★'}
+                    </Text>
                   )}
                   <Text style={styles.word}>{name}</Text>
                 </View>
@@ -127,6 +142,15 @@ const styles = StyleSheet.create({
   card: { backgroundColor: colors.card, borderRadius: 18, padding: 14 },
   wordRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
   emoji: { fontSize: 32, width: 48, textAlign: 'center' },
+  cluster: {
+    width: 88,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 1,
+  },
+  piece: { fontSize: 18, lineHeight: 22 },
   swatch: { width: 48, height: 48, borderRadius: 14 },
   word: { fontSize: 18, fontWeight: '900', color: colors.forestDeep, flex: 1 },
   meta: { marginTop: 4, color: colors.forest, fontWeight: '700' },

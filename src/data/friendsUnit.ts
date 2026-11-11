@@ -177,6 +177,8 @@ export type AlbumWord = {
   tr: string;
   emoji: string;
   swatch?: string;
+  scale?: number;
+  count?: number;
   clipId?: string;
 };
 
@@ -198,6 +200,8 @@ export function listAlbumWords(): AlbumWord[] {
       en: word.en,
       tr: word.tr,
       emoji: word.emoji,
+      scale: word.scale,
+      count: word.count,
       clipId: word.modelClip || undefined,
     });
   }
@@ -217,6 +221,8 @@ export function albumWord(id: string): AlbumWord | null {
     tr: word.tr,
     emoji: word.emoji,
     swatch: word.swatch,
+    scale: word.scale,
+    count: word.count,
     clipId: word.modelClip || undefined,
   };
 }
