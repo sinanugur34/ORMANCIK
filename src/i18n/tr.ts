@@ -389,6 +389,7 @@ export const tr = {
   'recovery.retry': 'Yeniden okumayı dene',
   'recovery.restore': 'Yedeği kullan',
   'recovery.noBackup': 'Kullanılacak yedek yok',
+  'recovery.backupUnreadable': 'Yedek de okunamadı',
   'recovery.startNew': 'Yeni kayıt başlat',
   'recovery.quarantineFail': 'Bu adım olmadı. Eski dosya olduğu gibi duruyor.',
   'shop.leaveGrownups': 'Yetişkin alanından çık',

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { migrateCurriculum } from '../src/data/curriculum';
-import { buildFriendsLevel } from '../src/data/friendsUnit';
+import { buildFriendsLevel, buildReviewLevel } from '../src/data/friendsUnit';
 import { applyAttempt } from '../src/data/learning';
 import { buildRounds, orderByNeed } from '../src/data/rounds';
 
@@ -72,5 +72,11 @@ assert.ok((ready?.lesson?.[0]?.choices.length ?? 0) >= 4);
 
 const known = buildFriendsLevel(6, '9-10', 'en', { englishLevel: 'ready', knownIds: ['cat', 'dog'] });
 assert.ok(known?.lesson?.every((step) => step.wordId === 'rabbit'));
+
+const colors = buildReviewLevel(['teal', 'berry'], '3-5', 'en');
+assert.deepEqual(
+  colors?.lesson?.map((step) => step.wordId),
+  ['teal', 'berry'],
+);
 
 console.log('learning review checks passed');

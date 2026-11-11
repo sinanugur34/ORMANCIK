@@ -11,7 +11,7 @@ import { colors } from '../theme/colors';
 
 export function SaveRecoveryScreen() {
   const t = useT();
-  const { backupAvailable, retrySaveLoad, restoreBackup, startNewSave } = useGame();
+  const { backupAvailable, retrySaveLoad, startNewSave } = useGame();
   const [gate, setGate] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,10 +43,10 @@ export function SaveRecoveryScreen() {
             onPress={() => void run(retrySaveLoad)}
           />
           <PrimaryButton
-            label={backupAvailable ? t('recovery.restore') : t('recovery.noBackup')}
+            label={backupAvailable ? t('recovery.backupUnreadable') : t('recovery.noBackup')}
             tone="sky"
-            disabled={busy || !backupAvailable}
-            onPress={() => void run(restoreBackup)}
+            disabled
+            onPress={() => undefined}
             style={{ marginTop: 12 }}
           />
           <PrimaryButton

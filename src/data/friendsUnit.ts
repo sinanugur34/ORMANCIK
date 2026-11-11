@@ -121,6 +121,8 @@ const REVIEW_EXTRA: CatalogWord[] = [
   { id: 'blue', emoji: '🔵', emojiAlt: '🟦', en: 'blue', tr: 'mavi', model: '', modelClip: '', find: 'Find the blue.', findClip: '', transfer: 'Touch the blue.', transferClip: '' },
   { id: 'purple', emoji: '🟣', emojiAlt: '🟪', en: 'purple', tr: 'mor', model: '', modelClip: '', find: 'Find the purple.', findClip: '', transfer: 'Touch the purple.', transferClip: '' },
   { id: 'orange', emoji: '🟠', emojiAlt: '🟧', en: 'orange', tr: 'turuncu', model: '', modelClip: '', find: 'Find the orange.', findClip: '', transfer: 'Touch the orange.', transferClip: '' },
+  { id: 'teal', emoji: '🫧', emojiAlt: '💠', en: 'teal', tr: 'deniz mavisi', model: '', modelClip: '', find: 'Find the teal.', findClip: '', transfer: 'Touch the teal.', transferClip: '' },
+  { id: 'berry', emoji: '🍇', emojiAlt: '🫐', en: 'berry', tr: 'böğürtlen', model: '', modelClip: '', find: 'Find the berry.', findClip: '', transfer: 'Touch the berry.', transferClip: '' },
   { id: 'one', emoji: '🍎', emojiAlt: '🌟', en: 'one', tr: 'bir', model: '', modelClip: '', find: 'Find one.', findClip: '', transfer: 'Touch one.', transferClip: '' },
   { id: 'two', emoji: '🍎🍎', emojiAlt: '🌟🌟', en: 'two', tr: 'iki', model: '', modelClip: '', find: 'Find two.', findClip: '', transfer: 'Touch two.', transferClip: '' },
   { id: 'three', emoji: '🍎🍎🍎', emojiAlt: '🌟🌟🌟', en: 'three', tr: 'üç', model: '', modelClip: '', find: 'Find three.', findClip: '', transfer: 'Touch three.', transferClip: '' },

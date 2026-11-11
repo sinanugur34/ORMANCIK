@@ -369,6 +369,7 @@ export const en: Record<TrKey, string> = {
   'recovery.retry': 'Try reading again',
   'recovery.restore': 'Use the backup',
   'recovery.noBackup': 'No backup to use',
+  'recovery.backupUnreadable': 'The backup could not be read either',
   'recovery.startNew': 'Start a new save',
   'recovery.quarantineFail': 'That step did not work. The old file was left as it is.',
   'shop.leaveGrownups': 'Leave grown-up area',

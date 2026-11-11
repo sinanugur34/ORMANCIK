@@ -1,6 +1,6 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { AnimatedBackground } from '../components/AnimatedBackground';
 import { LessonPlay } from '../components/LessonPlay';
@@ -38,7 +38,11 @@ export function ReviewScreen({ navigation, route }: Props) {
           </BouncePress>
           <Text style={styles.title}>{t('album.reviewTitle')}</Text>
         </View>
-        <View style={styles.body}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.body}
+          keyboardShouldPersistTaps="handled"
+        >
           {done ? (
             <>
               <Text style={styles.done}>{t('level.bravo')}</Text>
@@ -60,7 +64,7 @@ export function ReviewScreen({ navigation, route }: Props) {
               <PrimaryButton label={t('common.backArrow')} onPress={() => navigation.goBack()} />
             </>
           )}
-        </View>
+        </ScrollView>
       </SafeAreaView>
     </AnimatedBackground>
   );
@@ -77,11 +81,13 @@ const styles = StyleSheet.create({
   },
   backText: { fontWeight: '800', color: colors.forestDeep },
   title: { fontSize: 22, fontWeight: '900', color: colors.forestDeep },
+  scroll: { flex: 1 },
   body: {
     margin: 16,
     backgroundColor: colors.card,
     borderRadius: 24,
     padding: 16,
+    paddingBottom: 40,
   },
   done: {
     fontSize: 22,
