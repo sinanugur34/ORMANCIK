@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-na
 import { isVoiceNarrationEnabled, promptHasStarted, resetPromptAudible, speakKidPrompt, stopSpeaking, type SpeakOutcome } from '../audio/speakPrompt';
 import type { LessonChoice, LessonStep } from '../data/friendsUnit';
 import { skillAfterPrompt, type WordAttempt } from '../data/learning';
+import { holdLessonSteps } from '../data/lessonVisit';
 import { starsFromMistakes, type LevelDef } from '../data/levels';
 import { useT } from '../i18n';
 import type { AgeBand } from '../theme/colors';
@@ -42,7 +43,10 @@ type Props = {
 export function LessonPlay({ level, band, hintsEnabled, onWin }: Props) {
   const t = useT();
   const { width } = useWindowDimensions();
-  const steps = level.lesson ?? [];
+  const heldSteps = useRef<{ id: number; steps: readonly LessonStep[] } | null>(null);
+  const held = holdLessonSteps(heldSteps.current, level.id, level.lesson ?? []);
+  heldSteps.current = held;
+  const steps = held.steps;
   const [index, setIndex] = useState(0);
   const [mistakes, setMistakes] = useState(0);
   const [helpOn, setHelpOn] = useState(false);

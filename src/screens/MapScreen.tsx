@@ -44,6 +44,12 @@ export function MapScreen({ navigation }: Props) {
   const stopLabel = (id: number) =>
     id >= 1 && id <= 8 ? t(`map.friend.${id}`) : t('map.levelStop', { n: id });
 
+  const stopName = (id: number, done: boolean, unlocked: boolean, current: boolean) =>
+    t(done ? 'map.a11yDone' : current ? 'map.a11yNow' : unlocked ? 'map.a11yOpen' : 'map.a11yLocked', {
+      n: id,
+      name: stopLabel(id),
+    });
+
   return (
     <View style={styles.root}>
       <ImageBackground source={require('../../assets/art/world-map.jpg')} style={styles.banner} resizeMode="cover">
@@ -77,6 +83,7 @@ export function MapScreen({ navigation }: Props) {
                   <BouncePress
                     key={id}
                     disabled={!unlocked}
+                    accessibilityLabel={stopName(id, done, unlocked, current)}
                     onPress={() => navigation.navigate('Level', { levelId: id })}
                     style={[styles.pathStop, current && styles.pathNow, done && styles.pathDone, !unlocked && styles.pathLocked]}
                   >
@@ -117,15 +124,22 @@ export function MapScreen({ navigation }: Props) {
                       {levels.map((id) => {
                         const unlocked = isLevelUnlocked(id);
                         const done = clearedLevelIds.includes(id);
+                        const current = id === nextLevel && !done;
                         return (
                           <BouncePress
                             key={id}
                             disabled={!unlocked}
+                            accessibilityLabel={stopName(id, done, unlocked, current)}
                             onPress={() => navigation.navigate('Level', { levelId: id })}
-                            style={[styles.levelDot, done && styles.levelDone, !unlocked && styles.levelLocked]}
+                            style={[
+                              styles.levelDot,
+                              done && styles.levelDone,
+                              current && styles.levelNow,
+                              !unlocked && styles.levelLocked,
+                            ]}
                           >
                             <Text style={[styles.levelNum, (done || !unlocked) && { color: colors.white }]}>
-                              {done ? '✓' : unlocked ? id : '🔒'}
+                              {done ? `✓ ${id}` : unlocked ? id : '🔒'}
                             </Text>
                           </BouncePress>
                         );
@@ -212,7 +226,7 @@ const styles = StyleSheet.create({
     padding: 14,
   },
   levelDot: {
-    width: 56,
+    width: 64,
     height: 56,
     borderRadius: 18,
     backgroundColor: colors.mint,
@@ -220,6 +234,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   levelDone: { backgroundColor: colors.forest },
+  levelNow: { borderWidth: 3, borderColor: colors.sun },
   levelLocked: { backgroundColor: 'rgba(92,107,115,0.45)' },
-  levelNum: { fontWeight: '800', color: colors.forestDeep, fontSize: 15 },
+  levelNum: { fontWeight: '800', color: colors.forestDeep, fontSize: 14 },
 });

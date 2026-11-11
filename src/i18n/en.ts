@@ -106,6 +106,10 @@ export const en: Record<TrKey, string> = {
   'map.friend.6': 'Find again',
   'map.friend.7': 'Greet',
   'map.friend.8': 'Together',
+  'map.a11yDone': 'Level {n}, {name}, completed',
+  'map.a11yNow': 'Level {n}, {name}, up next',
+  'map.a11yOpen': 'Level {n}, {name}, open',
+  'map.a11yLocked': 'Level {n}, {name}, locked',
 
   'level.locked': 'This level is still locked',
   'level.backMap': 'Back to map',

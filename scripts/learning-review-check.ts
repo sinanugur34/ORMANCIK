@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { animalRoundsFor, colorRoundsFor, shapeRoundsFor } from '../src/data/activityRounds';
 import { acceptFriendsReplay, declineFriendsReplay, loadCurriculum, migrateCurriculum } from '../src/data/curriculum';
 import { albumWord, buildFriendsLevel, buildReviewLevel } from '../src/data/friendsUnit';
+import { holdLessonSteps, lessonVisit } from '../src/data/lessonVisit';
 import { appendLearningNotes, applyAttempt, commitAttempts, familyStatus, heardIndependentCount, knownWordIds, localDayStamp, mergeWordProgress, pictureIndependentCount, practiceDay, practiceNoteFromStat, practiceResult, skillAfterPrompt } from '../src/data/learning';
 import { buildLevel } from '../src/data/levels';
 import { buildRounds, orderByNeed, shapePixelSize } from '../src/data/rounds';
@@ -518,5 +519,54 @@ assert.ok((afterPink['color.pink']?.reviewAt ?? 0) > 50_000);
 const againPink = mergeWordProgress(afterPink);
 assert.equal(againPink['color.pink']?.attempts, 3);
 assert.equal(familyStatus(afterPink['color.pink']!), 'solo');
+
+const visitClock = 1_700_000_000_000;
+const catOnce = applyAttempt(
+  undefined,
+  { id: 'cat', independent: true, firstTry: true, correct: true, skill: 'listen-recognize' },
+  visitClock,
+);
+assert.equal(heardIndependentCount(catOnce), 1);
+const openingKnown = knownWordIds({ cat: catOnce }, visitClock + 1000);
+assert.equal(openingKnown.includes('cat'), false);
+const visitKey = '6:6-8:tr:ready';
+const visit = lessonVisit(null, visitKey, openingKnown);
+const opened = buildFriendsLevel(6, '6-8', 'tr', { englishLevel: 'ready', knownIds: visit.knownIds });
+assert.deepEqual(
+  opened?.lesson?.map((step) => step.wordId),
+  ['cat', 'dog', 'rabbit'],
+);
+const catTwice = applyAttempt(
+  catOnce,
+  { id: 'cat', independent: true, firstTry: true, correct: true, skill: 'listen-recognize' },
+  visitClock + 2000,
+);
+const savedKnown = knownWordIds({ cat: catTwice }, visitClock + 3000);
+assert.equal(savedKnown.includes('cat'), true);
+const heldVisit = lessonVisit(visit, visitKey, savedKnown);
+assert.equal(heldVisit, visit);
+const stillPlaying = buildFriendsLevel(6, '6-8', 'tr', { englishLevel: 'ready', knownIds: heldVisit.knownIds });
+assert.equal(stillPlaying?.lesson?.[2]?.wordId, 'rabbit');
+const shrunk = buildFriendsLevel(6, '6-8', 'tr', { englishLevel: 'ready', knownIds: savedKnown });
+assert.equal(shrunk?.lesson?.length, 2);
+assert.equal(shrunk?.lesson?.[2], undefined);
+const heldSteps = holdLessonSteps(null, 6, opened?.lesson ?? []);
+const keptSteps = holdLessonSteps(heldSteps, 6, shrunk?.lesson ?? []);
+assert.equal(keptSteps, heldSteps);
+assert.equal(keptSteps.steps[2]?.wordId, 'rabbit');
+const greet = buildFriendsLevel(7, '6-8', 'tr', { englishLevel: 'ready', knownIds: [] });
+assert.equal(greet?.lesson?.length, 2);
+const greetHeld = holdLessonSteps(null, 7, greet?.lesson ?? []);
+const greetShrunk = buildFriendsLevel(7, '6-8', 'tr', { englishLevel: 'ready', knownIds: ['hello'] });
+assert.equal(greetShrunk?.lesson?.length, 1);
+assert.equal(holdLessonSteps(greetHeld, 7, greetShrunk?.lesson ?? []).steps.length, 2);
+const nextPlay = lessonVisit(null, visitKey, savedKnown);
+const nextLesson = buildFriendsLevel(6, '6-8', 'tr', { englishLevel: 'ready', knownIds: nextPlay.knownIds });
+assert.ok(nextLesson?.lesson?.every((step) => step.wordId !== 'cat'));
+const allKnown = buildFriendsLevel(6, '6-8', 'tr', {
+  englishLevel: 'ready',
+  knownIds: ['cat', 'dog', 'rabbit'],
+});
+assert.equal(allKnown?.lesson?.length, 3);
 
 console.log('learning review checks passed');

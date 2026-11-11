@@ -112,6 +112,10 @@ export const tr = {
   'map.friend.6': 'Yeniden bul',
   'map.friend.7': 'Selamla',
   'map.friend.8': 'Bir araya gel',
+  'map.a11yDone': '{n}. bölüm, {name}, tamamlandı',
+  'map.a11yNow': '{n}. bölüm, {name}, sıradaki',
+  'map.a11yOpen': '{n}. bölüm, {name}, açık',
+  'map.a11yLocked': '{n}. bölüm, {name}, kilitli',
 
   // Level
   'level.locked': 'Bu bölüm henüz kilitli',
