@@ -105,10 +105,13 @@ export function practiceDay(at: number, now = Date.now(), timeZone?: string): Pr
 
 export function skillAfterPrompt(
   requested: LearningSkill,
-  outcome: 'played' | 'muted' | 'failed' | 'cut' | null,
+  outcome: 'played' | 'muted' | 'failed' | 'cut' | 'started' | null,
+  started = false,
 ): LearningSkill {
   if (requested === 'count-quantity') return 'count-quantity';
-  return outcome === 'played' ? 'listen-recognize' : 'picture-match';
+  if (outcome === 'muted') return 'picture-match';
+  if (started || outcome === 'played' || outcome === 'started') return 'listen-recognize';
+  return 'picture-match';
 }
 
 function heardSoFar(prev: WordStat | undefined): number {
@@ -149,8 +152,9 @@ export function applyAttempt(
     const first = lastIndependentDay === 0;
     const laterDay = day !== lastIndependentDay;
     const laterSession = sessionId !== lastSessionId;
-    const gap = now - lastIndependentAt;
-    if (first || (lastIndependentAt > 0 && laterDay && laterSession && gap >= HEARD_GAP_MS)) {
+    const priorAt = lastIndependentAt > 0 ? lastIndependentAt : base.lastAt;
+    const gap = priorAt > 0 ? now - priorAt : 0;
+    if (first || (priorAt > 0 && laterDay && laterSession && gap >= HEARD_GAP_MS)) {
       independentDays += 1;
       lastIndependentDay = day;
     }

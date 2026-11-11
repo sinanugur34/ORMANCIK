@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { isVoiceNarrationEnabled, speakKidPrompt, stopSpeaking, type SpeakOutcome } from '../audio/speakPrompt';
+import { isVoiceNarrationEnabled, promptHasStarted, resetPromptAudible, speakKidPrompt, stopSpeaking, type SpeakOutcome } from '../audio/speakPrompt';
 import type { LessonChoice, LessonStep } from '../data/friendsUnit';
 import { skillAfterPrompt, type WordAttempt } from '../data/learning';
 import { starsFromMistakes, type LevelDef } from '../data/levels';
@@ -80,6 +80,7 @@ export function LessonPlay({ level, band, hintsEnabled, onWin }: Props) {
     stepBusy.current = false;
     helpUsed.current = false;
     missed.current = false;
+    resetPromptAudible();
     promptOutcome.current = isVoiceNarrationEnabled() ? null : 'muted';
     let live = true;
     void speakKidPrompt(step.say, { lang: 'en', clipId: step.clipId }).then((outcome) => {
@@ -118,7 +119,7 @@ export function LessonPlay({ level, band, hintsEnabled, onWin }: Props) {
     advance();
   };
 
-  const measuredSkill = () => skillAfterPrompt('listen-recognize', promptOutcome.current);
+  const measuredSkill = () => skillAfterPrompt('listen-recognize', promptOutcome.current, promptHasStarted());
 
   const onChoose = (id: string) => {
     if (settled.current || stepBusy.current || !step || step.kind === 'model') return;

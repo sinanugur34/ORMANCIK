@@ -8,7 +8,7 @@ import Animated, {
   withSequence,
   withSpring,
 } from 'react-native-reanimated';
-import { isVoiceNarrationEnabled, speakKidPrompt, speakPraise, stopSpeaking, type SpeakOutcome } from '../audio/speakPrompt';
+import { isVoiceNarrationEnabled, promptHasStarted, resetPromptAudible, speakKidPrompt, speakPraise, stopSpeaking, type SpeakOutcome } from '../audio/speakPrompt';
 import { animalRoundsFor, colorRoundsFor, shapeRoundsFor } from '../data/activityRounds';
 import { buildRounds, playSeed, seededShuffle, shapePixelSize } from '../data/rounds';
 import { tFor, useT } from '../i18n';
@@ -386,7 +386,7 @@ function ArcadeLevel({ level, band, hintsEnabled, wordProgress = EMPTY_PROGRESS,
     wordLog.current.push({
       id,
       correct,
-      skill: skillAfterPrompt(skill, promptOutcome.current),
+      skill: skillAfterPrompt(skill, promptOutcome.current, promptHasStarted()),
       independent: correct && !roundHelpRef.current && !roundMissRef.current,
       firstTry: correct && !roundHelpRef.current && !roundMissRef.current,
     });
@@ -557,7 +557,7 @@ function ArcadeLevel({ level, band, hintsEnabled, wordProgress = EMPTY_PROGRESS,
       wordLog.current.push({
         id: wordId,
         correct: true,
-        skill: skillAfterPrompt('listen-recognize', promptOutcome.current),
+        skill: skillAfterPrompt('listen-recognize', promptOutcome.current, promptHasStarted()),
         independent: !animalHelpUsed.current,
         firstTry: !animalMissed.current && !animalHelpUsed.current,
       });
@@ -576,7 +576,7 @@ function ArcadeLevel({ level, band, hintsEnabled, wordProgress = EMPTY_PROGRESS,
       wordLog.current.push({
         id: wordId,
         correct: false,
-        skill: skillAfterPrompt('listen-recognize', promptOutcome.current),
+        skill: skillAfterPrompt('listen-recognize', promptOutcome.current, promptHasStarted()),
         independent: false,
         firstTry: false,
       });
@@ -657,6 +657,7 @@ function ArcadeLevel({ level, band, hintsEnabled, wordProgress = EMPTY_PROGRESS,
 
   useEffect(() => {
     if (!speakEnglish) return;
+    resetPromptAudible();
     promptOutcome.current = isVoiceNarrationEnabled() ? null : 'muted';
     let live = true;
     void speakKidPrompt(spokenPrompt, { lang: 'en' }).then((outcome) => {

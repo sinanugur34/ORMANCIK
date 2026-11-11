@@ -76,6 +76,8 @@ export type SpeakOptions = {
   /** Bundled clip id. Played offline, with no network and no child name. */
   clipId?: string;
   slow?: boolean;
+  /** Praise and other asides do not count as the question the child is answering. */
+  countsAsPrompt?: boolean;
 };
 
 /** played: the line finished. muted: sound is off. failed: nothing started. cut: it stopped early. */
@@ -85,6 +87,21 @@ type SpeakWaiter = { token: number; finish: (outcome: SpeakOutcome) => void };
 
 let waiter: SpeakWaiter | null = null;
 let lastOutcome: SpeakOutcome | null = null;
+/** True after this question's line has actually begun, including a replay. A new question clears it. */
+let promptAudible = false;
+let countAudible = true;
+
+export function resetPromptAudible(): void {
+  promptAudible = false;
+}
+
+export function promptHasStarted(): boolean {
+  return promptAudible;
+}
+
+function markPromptAudible(): void {
+  if (countAudible) promptAudible = true;
+}
 
 export function lastPromptOutcome(): SpeakOutcome | null {
   return lastOutcome;
@@ -289,6 +306,9 @@ async function playSource(source: string | number, token: number, rate: number):
             reject(new Error('HTMLAudio playback failed'));
           }
         }, { once: true });
+        el.addEventListener('playing', () => {
+          if (stillCurrent(token)) markPromptAudible();
+        }, { once: true });
         el.addEventListener('ended', () => finish(stillCurrent(token) ? 'played' : 'cut'), { once: true });
         el.addEventListener('pause', () => {
           if (!stillCurrent(token)) finish('cut');
@@ -328,7 +348,10 @@ async function playSource(source: string | number, token: number, rate: number):
         finish('cut');
         return;
       }
-      if (status.playing) started = true;
+      if (status.playing) {
+        started = true;
+        markPromptAudible();
+      }
       const ended =
         status.didJustFinish ||
         (started && status.duration > 0 && !status.playing && status.currentTime >= status.duration - 0.05);
@@ -430,6 +453,9 @@ function speakWithExpoSpeech(text: string, lang: Language, token: number, slow: 
           pitch,
           rate: slow ? base * SLOW_RATE : base,
           ...(resolved.identifier ? { voice: resolved.identifier } : {}),
+          onStart: () => {
+            if (stillCurrent(token)) markPromptAudible();
+          },
           onDone: () => finish(stillCurrent(token) ? 'played' : 'cut'),
           onStopped: () => finish('cut'),
           onError: () => finish(stillCurrent(token) ? 'failed' : 'cut'),
@@ -448,6 +474,7 @@ function speakWithExpoSpeech(text: string, lang: Language, token: number, slow: 
  */
 export async function speakKidPrompt(text: string, options?: SpeakOptions): Promise<SpeakOutcome> {
   const trimmed = text?.trim();
+  countAudible = options?.countsAsPrompt !== false;
   if (!trimmed || !voiceEnabled) {
     lastOutcome = 'muted';
     return 'muted';
@@ -523,5 +550,5 @@ export async function speakPraise(): Promise<void> {
   if (now - lastInstructionAt < 1600) return;
   if (now - lastPraiseAt < PRAISE_MIN_GAP_MS) return;
   lastPraiseAt = now;
-  await speakKidPrompt('Yes!', { lang: 'en', clipId: 'praise-yes' });
+  await speakKidPrompt('Yes!', { lang: 'en', clipId: 'praise-yes', countsAsPrompt: false });
 }

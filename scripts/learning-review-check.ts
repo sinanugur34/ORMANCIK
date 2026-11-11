@@ -291,7 +291,28 @@ assert.equal(skillAfterPrompt('listen-recognize', 'muted'), 'picture-match');
 assert.equal(skillAfterPrompt('listen-recognize', 'failed'), 'picture-match');
 assert.equal(skillAfterPrompt('listen-recognize', 'cut'), 'picture-match');
 assert.equal(skillAfterPrompt('listen-recognize', 'played'), 'listen-recognize');
+assert.equal(skillAfterPrompt('listen-recognize', null, true), 'listen-recognize');
+assert.equal(skillAfterPrompt('listen-recognize', 'cut', true), 'listen-recognize');
+assert.equal(skillAfterPrompt('listen-recognize', 'muted', true), 'picture-match');
 assert.equal(skillAfterPrompt('count-quantity', 'muted'), 'count-quantity');
+const older: Parameters<typeof applyAttempt>[0] = {
+  id: 'cat',
+  skill: 'listen-recognize',
+  independent: 1,
+  hinted: 0,
+  firstTry: 1,
+  attempts: 1,
+  lastAt: Date.parse('2026-11-11T07:00:00Z'),
+  reviewAt: 1,
+  independentDays: 1,
+  lastIndependentDay: localDayStamp(Date.parse('2026-11-11T07:00:00Z'), zone),
+  transferIndependent: 1,
+};
+const carried = applyAttempt(older, heardAttempt, nextAfternoon, { sessionId: 9, timeZone: zone });
+assert.equal(carried.independentDays, 2);
+assert.equal(familyStatus(carried), 'recalled');
+const tooSoon = applyAttempt(older, heardAttempt, older.lastAt + 2 * 60 * 1000, { sessionId: 9, timeZone: zone });
+assert.equal(tooSoon.independentDays, 1);
 const noon = Date.parse('2026-11-11T09:00:00Z');
 assert.equal(practiceDay(noon, noon, zone), 'today');
 assert.equal(practiceDay(noon - 24 * 60 * 60 * 1000, noon, zone), 'yesterday');
