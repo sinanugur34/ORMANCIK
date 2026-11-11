@@ -14,8 +14,8 @@ import { COSMETICS } from '../data/cosmetics';
 import { TOTAL_LEVELS } from '../data/islands';
 import { isDeviceTurkish } from '../i18n/deviceLocale';
 import { setLanguage as setI18nLanguage, t, type Language } from '../i18n';
-import { CURRICULUM_VERSION, acceptFriendsReplay, declineFriendsReplay, migrateCurriculum, saveNeedsRepairCopy } from '../data/curriculum';
-import { commitAttempts, mergeWordProgress, type EnglishLevel, type WordAttempt, type WordStat } from '../data/learning';
+import { CURRICULUM_VERSION, acceptFriendsReplay, declineFriendsReplay, loadCurriculum, saveNeedsRepairCopy } from '../data/curriculum';
+import { appendLearningNotes, commitAttempts, currentLearningSession, mergeWordProgress, nextLearningSession, type EnglishLevel, type LearningNote, type WordAttempt, type WordStat } from '../data/learning';
 import { ageToBand, AgeBand } from '../theme/colors';
 
 const STORAGE_KEY = 'ormancik-v1';
@@ -65,8 +65,12 @@ export type ChildProfile = {
   legacyLevelIds: number[];
   /** Grown-up can replay levels 1–8 when an older version may have skipped them. */
   replayOffer: boolean;
+  /** Present after the grown-up accepts or declines the replay question. */
+  replayDecision?: 'accept' | 'decline';
   /** Home tasks a grown-up marked as done together. Not an English score. */
   homeTasks: string[];
+  /** Dated attempts for the family view. Not a mastery score. */
+  recentLearning: LearningNote[];
 };
 
 type DevicePersisted = {
@@ -172,6 +176,7 @@ type GameContextValue = {
   acceptReplay: () => void;
   declineReplay: () => void;
   homeTasks: string[];
+  recentLearning: LearningNote[];
   markHomeTask: (id: string) => void;
   retrySaveLoad: () => Promise<void>;
   restoreBackup: () => Promise<boolean>;
@@ -230,7 +235,7 @@ function clampAge(age: number): number {
 
 function learningDefaults(raw?: Partial<ChildProfile>): Pick<
   ChildProfile,
-  'hintsEnabled' | 'englishLevel' | 'wordProgress' | 'sessionLimit' | 'levelStars' | 'replayOffer' | 'homeTasks'
+  'hintsEnabled' | 'englishLevel' | 'wordProgress' | 'sessionLimit' | 'levelStars' | 'replayOffer' | 'homeTasks' | 'recentLearning'
 > {
   const level = raw?.englishLevel;
   return {
@@ -241,6 +246,9 @@ function learningDefaults(raw?: Partial<ChildProfile>): Pick<
     levelStars: raw?.levelStars && typeof raw.levelStars === 'object' ? raw.levelStars : {},
     replayOffer: raw?.replayOffer ?? false,
     homeTasks: Array.isArray(raw?.homeTasks) ? raw.homeTasks.filter((id) => typeof id === 'string') : [],
+    recentLearning: Array.isArray(raw?.recentLearning)
+      ? raw.recentLearning.filter((note) => note && typeof note.id === 'string' && typeof note.at === 'number').slice(-40)
+      : [],
   };
 }
 
@@ -272,15 +280,7 @@ function makeProfile(name: string, age: number, progress?: Partial<ChildProfile>
 }
 
 function profileFromSaved(raw: Partial<ChildProfile> & { name?: string; age?: number }): ChildProfile {
-  const curriculum = migrateCurriculum({
-    clearedLevelIds: raw.clearedLevelIds,
-    levelStars: raw.levelStars,
-    wordProgress: raw.wordProgress,
-    contentVersion: raw.contentVersion,
-    friendsIntro: raw.friendsIntro,
-    legacyLevelIds: raw.legacyLevelIds,
-    replayOffer: raw.replayOffer,
-  });
+  const curriculum = loadCurriculum(raw);
   return {
     ...makeProfile(raw.name || t('common.player'), raw.age ?? 5, {
       ...raw,
@@ -293,6 +293,7 @@ function profileFromSaved(raw: Partial<ChildProfile> & { name?: string; age?: nu
     friendsIntro: curriculum.friendsIntro,
     legacyLevelIds: curriculum.legacyLevelIds,
     replayOffer: curriculum.replayOffer,
+    replayDecision: curriculum.replayDecision,
   };
 }
 
@@ -528,6 +529,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     if (!s.profiles.some((p) => p.id === id)) return false;
     commit({ ...s, activeProfileId: id });
     // Each child has their own sitting. Switching starts the break count again.
+    nextLearningSession();
     setSittingCount(0);
     return true;
   }, [commit]);
@@ -659,7 +661,8 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     commit(
       patchActive(stateRef.current, (p) => ({
         ...p,
-        wordProgress: commitAttempts(p.wordProgress, attempts, now),
+        wordProgress: commitAttempts(p.wordProgress, attempts, now, { sessionId: currentLearningSession() }),
+        recentLearning: appendLearningNotes(p.recentLearning, attempts, now),
       })),
     );
   }, [commit]);
@@ -853,6 +856,7 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       friendsIntro: activeProfile?.friendsIntro ?? false,
       replayOffer: activeProfile?.replayOffer ?? false,
       homeTasks: activeProfile?.homeTasks ?? [],
+      recentLearning: activeProfile?.recentLearning ?? [],
       createProfile,
       switchProfile,
       deleteProfile,

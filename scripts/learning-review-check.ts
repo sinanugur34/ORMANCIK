@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import { animalRoundsFor, colorRoundsFor, shapeRoundsFor } from '../src/data/activityRounds';
-import { acceptFriendsReplay, declineFriendsReplay, migrateCurriculum } from '../src/data/curriculum';
+import { acceptFriendsReplay, declineFriendsReplay, loadCurriculum, migrateCurriculum } from '../src/data/curriculum';
 import { albumWord, buildFriendsLevel, buildReviewLevel } from '../src/data/friendsUnit';
-import { applyAttempt, commitAttempts, familyStatus, mergeWordProgress } from '../src/data/learning';
+import { applyAttempt, commitAttempts, familyStatus, localDayStamp, mergeWordProgress, practiceDay, skillAfterPrompt } from '../src/data/learning';
 import { buildLevel } from '../src/data/levels';
 import { buildRounds, orderByNeed, shapePixelSize } from '../src/data/rounds';
 
@@ -226,6 +226,76 @@ const reopened = migrateCurriculum({
 });
 assert.equal(reopened.replayOffer, true);
 assert.ok(reopened.clearedLevelIds.includes(1));
+const keptOffer = loadCurriculum({
+  contentVersion: reopened.contentVersion,
+  clearedLevelIds: reopened.clearedLevelIds,
+  friendsIntro: reopened.friendsIntro,
+  legacyLevelIds: reopened.legacyLevelIds,
+  replayOffer: reopened.replayOffer,
+  replayDecision: reopened.replayDecision,
+});
+assert.equal(keptOffer.replayOffer, true);
+const keptDecline = loadCurriculum(declined);
+assert.equal(keptDecline.replayOffer, false);
+assert.equal(keptDecline.replayDecision, 'decline');
+assert.equal(replayed.replayDecision, 'accept');
+const finishedUnit = loadCurriculum({
+  contentVersion: 3,
+  clearedLevelIds: [1, 2, 3, 4, 5, 6, 7, 8],
+  friendsIntro: false,
+  legacyLevelIds: [],
+  replayOffer: false,
+});
+assert.equal(finishedUnit.replayOffer, false, 'a real finish is not turned back into a replay offer');
+
+const heardAttempt = {
+  id: 'cat',
+  independent: true,
+  firstTry: true,
+  correct: true,
+  variant: 'transfer' as const,
+  skill: 'listen-recognize' as const,
+};
+const zone = 'Europe/Istanbul';
+const lateNight = Date.parse('2026-11-11T23:59:59Z');
+let sitting = applyAttempt(undefined, heardAttempt, lateNight, { sessionId: 1, timeZone: zone });
+sitting = applyAttempt(sitting, heardAttempt, lateNight + 2000, { sessionId: 1, timeZone: zone });
+assert.equal(localDayStamp(lateNight, zone), localDayStamp(lateNight + 2000, zone));
+assert.equal(sitting.independentDays, 1);
+assert.equal(familyStatus(sitting), 'solo');
+const morning = Date.parse('2026-11-11T21:30:00Z');
+const acrossMidnight = applyAttempt(
+  applyAttempt(undefined, heardAttempt, Date.parse('2026-11-11T20:00:00Z'), { sessionId: 1, timeZone: zone }),
+  heardAttempt,
+  morning,
+  { sessionId: 2, timeZone: zone },
+);
+assert.equal(acrossMidnight.independentDays, 1);
+const nextAfternoon = Date.parse('2026-11-13T12:00:00Z');
+const sameSession = applyAttempt(sitting, heardAttempt, nextAfternoon, { sessionId: 1, timeZone: zone });
+assert.equal(sameSession.independentDays, 1);
+const recalled = applyAttempt(sitting, heardAttempt, nextAfternoon, { sessionId: 2, timeZone: zone });
+assert.equal(recalled.independentDays, 2);
+assert.equal(familyStatus(recalled), 'recalled');
+const quiet = applyAttempt(
+  undefined,
+  { ...heardAttempt, skill: 'picture-match' },
+  Date.parse('2026-11-11T07:00:00Z'),
+  { sessionId: 1, timeZone: zone },
+);
+const quietLater = applyAttempt(quiet, { ...heardAttempt, skill: 'picture-match' }, nextAfternoon, { sessionId: 2, timeZone: zone });
+assert.equal(quietLater.independentDays ?? 0, 0);
+assert.equal(familyStatus(quietLater), 'seen');
+assert.equal(skillAfterPrompt('listen-recognize', null), 'picture-match');
+assert.equal(skillAfterPrompt('listen-recognize', 'muted'), 'picture-match');
+assert.equal(skillAfterPrompt('listen-recognize', 'failed'), 'picture-match');
+assert.equal(skillAfterPrompt('listen-recognize', 'cut'), 'picture-match');
+assert.equal(skillAfterPrompt('listen-recognize', 'played'), 'listen-recognize');
+assert.equal(skillAfterPrompt('count-quantity', 'muted'), 'count-quantity');
+const noon = Date.parse('2026-11-11T09:00:00Z');
+assert.equal(practiceDay(noon, noon, zone), 'today');
+assert.equal(practiceDay(noon - 24 * 60 * 60 * 1000, noon, zone), 'yesterday');
+assert.equal(practiceDay(noon - 10 * 24 * 60 * 60 * 1000, noon, zone), 'earlier');
 
 const withoutRoom = mergeWordProgress({
   'room.hat': {

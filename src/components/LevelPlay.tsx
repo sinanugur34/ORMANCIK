@@ -8,11 +8,11 @@ import Animated, {
   withSequence,
   withSpring,
 } from 'react-native-reanimated';
-import { speakKidPrompt, speakPraise, stopSpeaking } from '../audio/speakPrompt';
+import { isVoiceNarrationEnabled, speakKidPrompt, speakPraise, stopSpeaking, type SpeakOutcome } from '../audio/speakPrompt';
 import { animalRoundsFor, colorRoundsFor, shapeRoundsFor } from '../data/activityRounds';
 import { buildRounds, playSeed, seededShuffle, shapePixelSize } from '../data/rounds';
 import { tFor, useT } from '../i18n';
-import { type LearningSkill, type WordAttempt, type WordStat } from '../data/learning';
+import { skillAfterPrompt, type LearningSkill, type WordAttempt, type WordStat } from '../data/learning';
 import { LevelDef, starsFromMistakes } from '../data/levels';
 import { AgeBand, colors } from '../theme/colors';
 import { colorId, colorName } from '../theme/colorNames';
@@ -93,6 +93,12 @@ function ArcadeLevel({ level, band, hintsEnabled, wordProgress = EMPTY_PROGRESS,
   const roundHelpRef = useRef(false);
   const roundMissRef = useRef(false);
   const wordLog = useRef<WordAttempt[]>([]);
+  const promptOutcome = useRef<SpeakOutcome | null>(null);
+  const noteSpeech = (text: string, slow = false) => {
+    void speakKidPrompt(text, { lang: 'en', slow }).then((outcome) => {
+      if (outcome === 'played' || promptOutcome.current !== 'played') promptOutcome.current = outcome;
+    });
+  };
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
@@ -380,7 +386,7 @@ function ArcadeLevel({ level, band, hintsEnabled, wordProgress = EMPTY_PROGRESS,
     wordLog.current.push({
       id,
       correct,
-      skill,
+      skill: skillAfterPrompt(skill, promptOutcome.current),
       independent: correct && !roundHelpRef.current && !roundMissRef.current,
       firstTry: correct && !roundHelpRef.current && !roundMissRef.current,
     });
@@ -551,7 +557,7 @@ function ArcadeLevel({ level, band, hintsEnabled, wordProgress = EMPTY_PROGRESS,
       wordLog.current.push({
         id: wordId,
         correct: true,
-        skill: 'listen-recognize',
+        skill: skillAfterPrompt('listen-recognize', promptOutcome.current),
         independent: !animalHelpUsed.current,
         firstTry: !animalMissed.current && !animalHelpUsed.current,
       });
@@ -570,12 +576,13 @@ function ArcadeLevel({ level, band, hintsEnabled, wordProgress = EMPTY_PROGRESS,
       wordLog.current.push({
         id: wordId,
         correct: false,
+        skill: skillAfterPrompt('listen-recognize', promptOutcome.current),
         independent: false,
         firstTry: false,
       });
       flash(false);
       const name = tFor('en', targetAnimal.labelKey);
-      void speakKidPrompt(`${name}. This is a ${name.toLowerCase()}.`, { lang: 'en', slow: true });
+      noteSpeech(`${name}. This is a ${name.toLowerCase()}.`, true);
     }
   };
 
@@ -650,8 +657,14 @@ function ArcadeLevel({ level, band, hintsEnabled, wordProgress = EMPTY_PROGRESS,
 
   useEffect(() => {
     if (!speakEnglish) return;
-    void speakKidPrompt(spokenPrompt, { lang: 'en' });
+    promptOutcome.current = isVoiceNarrationEnabled() ? null : 'muted';
+    let live = true;
+    void speakKidPrompt(spokenPrompt, { lang: 'en' }).then((outcome) => {
+      if (!live) return;
+      if (outcome === 'played' || promptOutcome.current !== 'played') promptOutcome.current = outcome;
+    });
     return () => {
+      live = false;
       void stopSpeaking();
     };
   }, [level.id, spokenPrompt, speakEnglish, progress, animalCursor]);
@@ -738,7 +751,7 @@ function ArcadeLevel({ level, band, hintsEnabled, wordProgress = EMPTY_PROGRESS,
             onPress={() => {
               roundHelpRef.current = true;
               setRoundHelp(true);
-              void speakKidPrompt(spokenPrompt, { lang: 'en', slow: true });
+              noteSpeech(spokenPrompt, true);
             }}
             style={styles.helpBtn}
           >
@@ -785,7 +798,7 @@ function ArcadeLevel({ level, band, hintsEnabled, wordProgress = EMPTY_PROGRESS,
             onPress={() => {
               roundHelpRef.current = true;
               setRoundHelp(true);
-              void speakKidPrompt(spokenPrompt, { lang: 'en', slow: true });
+              noteSpeech(spokenPrompt, true);
             }}
             style={styles.helpBtn}
           >
@@ -916,7 +929,7 @@ function ArcadeLevel({ level, band, hintsEnabled, wordProgress = EMPTY_PROGRESS,
               onPress={() => {
                 roundHelpRef.current = true;
                 setRoundHelp(true);
-                void speakKidPrompt(spokenPrompt, { lang: 'en', slow: true });
+                noteSpeech(spokenPrompt, true);
               }}
               style={styles.helpBtn}
             >
@@ -1086,7 +1099,7 @@ function ArcadeLevel({ level, band, hintsEnabled, wordProgress = EMPTY_PROGRESS,
             onPress={() => {
               animalHelpUsed.current = true;
               setAnimalHelp(true);
-              void speakKidPrompt(animalPrompt, { lang: 'en', slow: true });
+              noteSpeech(animalPrompt, true);
             }}
             style={styles.helpBtn}
           >

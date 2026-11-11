@@ -28,6 +28,49 @@ import { colors } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Level'>;
 
+const FRIEND_STEPS = [
+  { emoji: '🐱', say: 'Call the cat.', label: 'level.friendsStepCat' },
+  { emoji: '🐶', say: 'The cat is here. Call the dog.', label: 'level.friendsStepDog' },
+  { emoji: '🐰', say: 'The dog is here. Call the rabbit.', label: 'level.friendsStepRabbit' },
+] as const;
+
+function FriendsFinale() {
+  const t = useT();
+  const [called, setCalled] = useState(0);
+  const together = called >= FRIEND_STEPS.length;
+
+  React.useEffect(() => {
+    const line = together
+      ? 'The cat, the dog, and the rabbit are together.'
+      : FRIEND_STEPS[called]?.say;
+    if (!line) return;
+    void speakKidPrompt(line, { lang: 'en' });
+  }, [called, together]);
+
+  return (
+    <View style={styles.finale}>
+      <View style={styles.rug}>
+        {FRIEND_STEPS.slice(0, called).map((friend) => (
+          <Text key={friend.emoji} style={styles.friend}>
+            {friend.emoji}
+          </Text>
+        ))}
+      </View>
+      {together ? (
+        <Text style={styles.modalSub}>{t('level.friendsTogether')}</Text>
+      ) : (
+        <BouncePress
+          onPress={() => setCalled((n) => Math.min(FRIEND_STEPS.length, n + 1))}
+          style={styles.callFriend}
+        >
+          <Text style={styles.friend}>{FRIEND_STEPS[called]?.emoji}</Text>
+          <Text style={styles.callLabel}>{t(FRIEND_STEPS[called]!.label)}</Text>
+        </BouncePress>
+      )}
+    </View>
+  );
+}
+
 function StarRow({ stars }: { stars: 1 | 2 | 3 }) {
   return (
     <View style={styles.starRow}>
@@ -87,8 +130,9 @@ export function LevelScreen({ navigation, route }: Props) {
       -1,
       true,
     );
+    if (levelId === 8) return;
     void speakKidPrompt(t('level.bravo'));
-  }, [won, pulse, t]);
+  }, [won, pulse, t, levelId]);
 
   const devamStyle = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }));
 
@@ -150,7 +194,7 @@ export function LevelScreen({ navigation, route }: Props) {
               <Text style={styles.modalSub}>
                 {t('level.rewardSub', { island: islandLabel, reward: awarded })}
               </Text>
-              {levelId === 8 ? <Text style={styles.modalSub}>{t('level.friendsTogether')}</Text> : null}
+              {levelId === 8 ? <FriendsFinale /> : null}
               <StarRow stars={stars} />
             </LinearGradient>
             <View style={styles.modalActions}>
@@ -249,7 +293,22 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   modalTitle: { marginTop: 4, fontSize: 34, fontWeight: '900', color: colors.white },
-  modalSub: { marginTop: 6, color: 'rgba(255,255,255,0.92)', fontWeight: '700', fontSize: 16 },
+  modalSub: { marginTop: 6, color: 'rgba(255,255,255,0.92)', fontWeight: '700', fontSize: 16, textAlign: 'center' },
+  finale: { alignItems: 'center', marginTop: 10 },
+  rug: {
+    minHeight: 54,
+    minWidth: 180,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+  },
+  friend: { fontSize: 32 },
+  callFriend: { marginTop: 8, alignItems: 'center' },
+  callLabel: { color: colors.white, fontWeight: '800', marginTop: 2 },
   starRow: { flexDirection: 'row', gap: 10, marginTop: 18 },
   star: {
     width: 44,

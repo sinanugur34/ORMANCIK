@@ -78,6 +78,26 @@ export type SpeakOptions = {
   slow?: boolean;
 };
 
+/** played: the line finished. muted: sound is off. failed: nothing started. cut: it stopped early. */
+export type SpeakOutcome = 'played' | 'muted' | 'failed' | 'cut';
+
+type SpeakWaiter = { token: number; finish: (outcome: SpeakOutcome) => void };
+
+let waiter: SpeakWaiter | null = null;
+let lastOutcome: SpeakOutcome | null = null;
+
+export function lastPromptOutcome(): SpeakOutcome | null {
+  return lastOutcome;
+}
+
+function completeWaiter(token: number, outcome: SpeakOutcome): void {
+  if (!waiter || waiter.token !== token) return;
+  const finish = waiter.finish;
+  waiter = null;
+  lastOutcome = outcome;
+  finish(outcome);
+}
+
 subscribeLanguage(() => {
   cachedFallbackVoice = undefined;
   cachedFallbackLang = undefined;
@@ -145,6 +165,12 @@ function haltPlayback(): Promise<void> {
 
 export async function stopSpeaking(): Promise<void> {
   generation += 1;
+  if (waiter) {
+    const current = waiter;
+    waiter = null;
+    lastOutcome = 'cut';
+    current.finish('cut');
+  }
   await haltPlayback();
 }
 
@@ -237,10 +263,10 @@ function stillCurrent(token: number): boolean {
   return token === generation && voiceEnabled;
 }
 
-async function playSource(source: string | number, token: number, rate: number): Promise<void> {
-  if (!stillCurrent(token)) return;
+async function playSource(source: string | number, token: number, rate: number): Promise<SpeakOutcome> {
+  if (!stillCurrent(token)) return 'cut';
   await ensureAudioMode();
-  if (!stillCurrent(token)) return;
+  if (!stillCurrent(token)) return 'cut';
 
   if (Platform.OS === 'web' && typeof source === 'string') {
     type BrowserAudio = { new (src?: string): HTMLAudioElement };
@@ -250,17 +276,31 @@ async function playSource(source: string | number, token: number, rate: number):
       el.preload = 'auto';
       el.playbackRate = rate;
       htmlAudio = el;
-      await new Promise<void>((resolve, reject) => {
-        el.addEventListener('error', () => reject(new Error('HTMLAudio playback failed')), { once: true });
-        el.addEventListener('playing', () => resolve(), { once: true });
+      return await new Promise<SpeakOutcome>((resolve, reject) => {
+        let settled = false;
+        const finish = (outcome: SpeakOutcome) => {
+          if (settled) return;
+          settled = true;
+          resolve(outcome);
+        };
+        el.addEventListener('error', () => {
+          if (!settled) {
+            settled = true;
+            reject(new Error('HTMLAudio playback failed'));
+          }
+        }, { once: true });
+        el.addEventListener('ended', () => finish(stillCurrent(token) ? 'played' : 'cut'), { once: true });
+        el.addEventListener('pause', () => {
+          if (!stillCurrent(token)) finish('cut');
+        });
         const started = el.play();
-        if (started && typeof started.then === 'function') started.catch(reject);
+        if (started && typeof started.then === 'function') started.catch((error: unknown) => {
+          if (!settled) {
+            settled = true;
+            reject(error instanceof Error ? error : new Error('HTMLAudio playback failed'));
+          }
+        });
       });
-      if (!stillCurrent(token)) {
-        el.pause();
-        if (htmlAudio === el) htmlAudio = null;
-      }
-      return;
     }
   }
 
@@ -268,10 +308,34 @@ async function playSource(source: string | number, token: number, rate: number):
   player.playbackRate = rate;
   if (!stillCurrent(token)) {
     player.remove();
-    return;
+    return 'cut';
   }
   currentPlayer = player;
-  player.play();
+  return await new Promise<SpeakOutcome>((resolve) => {
+    let settled = false;
+    let started = false;
+    let subscription: { remove: () => void } | null = null;
+    const finish = (outcome: SpeakOutcome) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      subscription?.remove();
+      resolve(outcome);
+    };
+    const timer = setTimeout(() => finish(stillCurrent(token) ? (started ? 'played' : 'failed') : 'cut'), 12000);
+    subscription = player.addListener('playbackStatusUpdate', (status) => {
+      if (!stillCurrent(token)) {
+        finish('cut');
+        return;
+      }
+      if (status.playing) started = true;
+      const ended =
+        status.didJustFinish ||
+        (started && status.duration > 0 && !status.playing && status.currentTime >= status.duration - 0.05);
+      if (ended) finish('played');
+    });
+    player.play();
+  });
 }
 
 function hintMatches(haystack: string, hint: string): boolean {
@@ -342,18 +406,38 @@ async function resolveFallbackVoice(lang: Language): Promise<ResolvedVoice> {
   return cachedFallbackVoice;
 }
 
-async function speakWithExpoSpeech(text: string, lang: Language, token: number, slow: boolean): Promise<void> {
-  if (!speechAvailable() || !stillCurrent(token)) return;
-  const resolved = await resolveFallbackVoice(lang);
-  if (!stillCurrent(token)) return;
-  const pitch = resolved.explicitlyFemale ? FALLBACK_FEMALE_PITCH : FALLBACK_MALE_PITCH;
-  const base = resolved.explicitlyFemale ? FALLBACK_FEMALE_RATE : FALLBACK_MALE_RATE;
-  Speech.speak(text, {
-    language: speechLocaleFor(lang),
-    pitch,
-    rate: slow ? base * SLOW_RATE : base,
-    ...(resolved.identifier ? { voice: resolved.identifier } : {}),
-    onError: () => undefined,
+function speakWithExpoSpeech(text: string, lang: Language, token: number, slow: boolean): Promise<SpeakOutcome> {
+  if (!speechAvailable() || !stillCurrent(token)) return Promise.resolve(stillCurrent(token) ? 'failed' : 'cut');
+  return new Promise((resolve) => {
+    void resolveFallbackVoice(lang).then((resolved) => {
+      if (!stillCurrent(token)) {
+        resolve('cut');
+        return;
+      }
+      let settled = false;
+      const finish = (outcome: SpeakOutcome) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve(outcome);
+      };
+      const timer = setTimeout(() => finish(stillCurrent(token) ? 'failed' : 'cut'), 12000);
+      const pitch = resolved.explicitlyFemale ? FALLBACK_FEMALE_PITCH : FALLBACK_MALE_PITCH;
+      const base = resolved.explicitlyFemale ? FALLBACK_FEMALE_RATE : FALLBACK_MALE_RATE;
+      try {
+        Speech.speak(text, {
+          language: speechLocaleFor(lang),
+          pitch,
+          rate: slow ? base * SLOW_RATE : base,
+          ...(resolved.identifier ? { voice: resolved.identifier } : {}),
+          onDone: () => finish(stillCurrent(token) ? 'played' : 'cut'),
+          onStopped: () => finish('cut'),
+          onError: () => finish(stillCurrent(token) ? 'failed' : 'cut'),
+        });
+      } catch {
+        finish(stillCurrent(token) ? 'failed' : 'cut');
+      }
+    }).catch(() => resolve(stillCurrent(token) ? 'failed' : 'cut'));
   });
 }
 
@@ -362,48 +446,73 @@ async function speakWithExpoSpeech(text: string, lang: Language, token: number, 
  * Phones play a bundled clip or the device voice. They do not call 127.0.0.1.
  * A stop, mute, or newer request invalidates audio that is still being prepared.
  */
-export async function speakKidPrompt(text: string, options?: SpeakOptions): Promise<void> {
+export async function speakKidPrompt(text: string, options?: SpeakOptions): Promise<SpeakOutcome> {
   const trimmed = text?.trim();
-  if (!trimmed || !voiceEnabled) return;
+  if (!trimmed || !voiceEnabled) {
+    lastOutcome = 'muted';
+    return 'muted';
+  }
+
+  if (waiter) {
+    const previous = waiter;
+    waiter = null;
+    lastOutcome = 'cut';
+    previous.finish('cut');
+  }
 
   const token = ++generation;
   lastInstructionAt = Date.now();
   await haltPlayback();
-  if (!stillCurrent(token)) return;
+  if (!stillCurrent(token)) {
+    lastOutcome = 'cut';
+    return 'cut';
+  }
 
   const lang = options?.lang ?? getLanguage();
   const rate = options?.slow ? SLOW_RATE : 1;
   const clip = bundledClip(options?.clipId);
 
+  return await new Promise<SpeakOutcome>((resolve) => {
+    waiter = {
+      token,
+      finish: (outcome) => {
+        lastOutcome = outcome;
+        resolve(outcome);
+      },
+    };
+    void runSpeech(trimmed, lang, token, rate, clip, !!options?.slow).then(
+      (outcome) => completeWaiter(token, outcome),
+      () => completeWaiter(token, stillCurrent(token) ? 'failed' : 'cut'),
+    );
+  });
+}
+
+async function runSpeech(
+  text: string,
+  lang: Language,
+  token: number,
+  rate: number,
+  clip: number | undefined,
+  slow: boolean,
+): Promise<SpeakOutcome> {
   if (clip != null) {
     try {
-      await playSource(clip, token, rate);
+      return await playSource(clip, token, rate);
     } catch {
-      if (stillCurrent(token)) await speakWithExpoSpeech(trimmed, lang, token, !!options?.slow);
+      if (!stillCurrent(token)) return 'cut';
+      return speakWithExpoSpeech(text, lang, token, slow);
     }
-    return;
   }
 
-  if (Platform.OS !== 'web') {
-    try {
-      await speakWithExpoSpeech(trimmed, lang, token, !!options?.slow);
-    } catch {
-      // Parental and play flows keep working if speech is missing.
-    }
-    return;
-  }
+  if (Platform.OS !== 'web') return speakWithExpoSpeech(text, lang, token, slow);
 
   try {
-    const uri = await synthesizeEdgeUri(trimmed, edgeVoiceFor(lang));
-    if (!stillCurrent(token)) return;
-    await playSource(uri, token, rate);
+    const uri = await synthesizeEdgeUri(text, edgeVoiceFor(lang));
+    if (!stillCurrent(token)) return 'cut';
+    return await playSource(uri, token, rate);
   } catch {
-    if (!stillCurrent(token)) return;
-    try {
-      await speakWithExpoSpeech(trimmed, lang, token, !!options?.slow);
-    } catch {
-      // ignore
-    }
+    if (!stillCurrent(token)) return 'cut';
+    return speakWithExpoSpeech(text, lang, token, slow);
   }
 }
 

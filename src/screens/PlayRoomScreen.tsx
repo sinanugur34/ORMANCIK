@@ -36,17 +36,23 @@ export function PlayRoomScreen({ navigation }: Props) {
   const [rabbitOn, setRabbitOn] = useState(false);
   const [doorOpen, setDoorOpen] = useState(false);
   const roomLine = !hatOn
-    ? { text: 'Put on the hat.', clipId: 'room-hat' }
+    ? { text: 'Put on the hat.', clipId: 'room-hat' as const }
     : !rabbitOn
       ? { text: 'Put the rabbit on the mat.', clipId: undefined }
       : !doorOpen
         ? { text: 'Open the door.', clipId: undefined }
         : null;
+  const roomCue = doorOpen
+    ? 'The door is open.'
+    : rabbitOn
+      ? 'The rabbit is on the mat. Open the door.'
+      : hatOn
+        ? 'The hat is on. Put the rabbit on the mat.'
+        : 'Put on the hat.';
 
   useEffect(() => {
-    if (!roomLine) return;
-    void speakKidPrompt(roomLine.text, { lang: 'en', clipId: roomLine.clipId });
-  }, [roomLine?.text, roomLine?.clipId]);
+    void speakKidPrompt(roomCue, { lang: 'en', clipId: hatOn || rabbitOn || doorOpen ? undefined : 'room-hat' });
+  }, [roomCue, hatOn, rabbitOn, doorOpen]);
 
   const ownedOutfits = useMemo(
     () =>
@@ -79,14 +85,31 @@ export function PlayRoomScreen({ navigation }: Props) {
           </View>
 
           <FadeInView style={styles.stage}>
-            <GroveMascot
-              size={180}
-              outfitEmoji={outfit?.emoji}
-              petEmoji={pet?.emoji}
-              fxEmoji={fx?.emoji}
-            />
+            <View style={styles.scene}>
+              <View style={[styles.door, doorOpen && styles.doorOpen]}>
+                <View style={[styles.doorPanel, doorOpen && styles.doorPanelOpen]} />
+                <Text style={styles.doorMark}>{doorOpen ? '🌿' : ''}</Text>
+              </View>
+              <GroveMascot
+                size={150}
+                outfitEmoji={outfit?.emoji}
+                petEmoji={pet?.emoji}
+                fxEmoji={fx?.emoji}
+                hatEmoji={hatOn ? '🎩' : undefined}
+              />
+            </View>
+            <View style={styles.mat}>
+              {rabbitOn ? <Text style={styles.rabbit}>🐰</Text> : null}
+            </View>
+            <Text style={styles.free}>{t('playRoom.free')}</Text>
             <Text style={styles.caption}>
-              {doorOpen ? t('playRoom.taskDone') : rabbitOn ? t('playRoom.taskDoor') : hatOn ? t('playRoom.taskRabbit') : t('playRoom.task')}
+              {doorOpen
+                ? t('playRoom.doneDoor')
+                : rabbitOn
+                  ? t('playRoom.doneRabbit')
+                  : hatOn
+                    ? t('playRoom.doneHat')
+                    : t('playRoom.task')}
             </Text>
             {roomLine ? <ListenBar text={roomLine.text} clipId={roomLine.clipId} lang="en" /> : null}
             <View style={styles.taskRow}>
@@ -148,6 +171,32 @@ export function PlayRoomScreen({ navigation }: Props) {
 }
 
 const styles = StyleSheet.create({
+  scene: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center', gap: 8 },
+  door: {
+    width: 54,
+    height: 96,
+    borderRadius: 12,
+    backgroundColor: '#6B3E26',
+    marginBottom: 28,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  doorOpen: { backgroundColor: '#F6E7C1' },
+  doorPanel: { position: 'absolute', left: 0, top: 0, bottom: 0, width: 54, backgroundColor: '#8A5A3A' },
+  doorPanelOpen: { width: 16 },
+  doorMark: { fontSize: 22 },
+  mat: {
+    width: 148,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(232, 196, 140, 0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: -8,
+  },
+  rabbit: { fontSize: 28, marginTop: -18 },
+  free: { marginTop: 8, color: colors.cream, fontWeight: '700', textAlign: 'center' },
   taskRow: { flexDirection: 'row', justifyContent: 'center', gap: 12, marginTop: 12 },
   taskBtn: {
     width: 72,

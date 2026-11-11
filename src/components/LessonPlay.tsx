@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { speakKidPrompt, stopSpeaking } from '../audio/speakPrompt';
+import { isVoiceNarrationEnabled, speakKidPrompt, stopSpeaking, type SpeakOutcome } from '../audio/speakPrompt';
 import type { LessonChoice, LessonStep } from '../data/friendsUnit';
-import type { WordAttempt } from '../data/learning';
+import { skillAfterPrompt, type WordAttempt } from '../data/learning';
 import { starsFromMistakes, type LevelDef } from '../data/levels';
 import { useT } from '../i18n';
 import type { AgeBand } from '../theme/colors';
@@ -52,6 +52,7 @@ export function LessonPlay({ level, band, hintsEnabled, onWin }: Props) {
   const missed = useRef(false);
   const words = useRef<WordAttempt[]>([]);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const promptOutcome = useRef<SpeakOutcome | null>(null);
 
   const step: LessonStep | undefined = steps[index];
 
@@ -79,8 +80,14 @@ export function LessonPlay({ level, band, hintsEnabled, onWin }: Props) {
     stepBusy.current = false;
     helpUsed.current = false;
     missed.current = false;
-    void speakKidPrompt(step.say, { lang: 'en', clipId: step.clipId });
+    promptOutcome.current = isVoiceNarrationEnabled() ? null : 'muted';
+    let live = true;
+    void speakKidPrompt(step.say, { lang: 'en', clipId: step.clipId }).then((outcome) => {
+      if (!live) return;
+      if (outcome === 'played' || promptOutcome.current !== 'played') promptOutcome.current = outcome;
+    });
     return () => {
+      live = false;
       void stopSpeaking();
     };
   }, [level.id, index, step]);
@@ -111,6 +118,8 @@ export function LessonPlay({ level, band, hintsEnabled, onWin }: Props) {
     advance();
   };
 
+  const measuredSkill = () => skillAfterPrompt('listen-recognize', promptOutcome.current);
+
   const onChoose = (id: string) => {
     if (settled.current || stepBusy.current || !step || step.kind === 'model') return;
     if (id === step.wordId) {
@@ -121,6 +130,7 @@ export function LessonPlay({ level, band, hintsEnabled, onWin }: Props) {
         correct: true,
         independent: !helpUsed.current,
         firstTry: !missed.current && !helpUsed.current,
+        skill: measuredSkill(),
         variant: step.kind === 'transfer' ? 'transfer' : 'find',
       });
       later(() => advance(), 450);
@@ -133,18 +143,23 @@ export function LessonPlay({ level, band, hintsEnabled, onWin }: Props) {
       correct: false,
       independent: false,
       firstTry: false,
+      skill: measuredSkill(),
     });
     setMistakes((m) => m + 1);
     setFeedback('bad');
     setHelpOn(true);
-    void speakKidPrompt(step.say, { lang: 'en', clipId: step.clipId, slow: true });
+    void speakKidPrompt(step.say, { lang: 'en', clipId: step.clipId, slow: true }).then((outcome) => {
+      if (outcome === 'played' || promptOutcome.current !== 'played') promptOutcome.current = outcome;
+    });
   };
 
   const showHelp = () => {
     if (!step || settled.current) return;
     helpUsed.current = true;
     setHelpOn(true);
-    void speakKidPrompt(step.say, { lang: 'en', clipId: step.clipId, slow: true });
+    void speakKidPrompt(step.say, { lang: 'en', clipId: step.clipId, slow: true }).then((outcome) => {
+      if (outcome === 'played' || promptOutcome.current !== 'played') promptOutcome.current = outcome;
+    });
   };
 
   if (!step) return null;

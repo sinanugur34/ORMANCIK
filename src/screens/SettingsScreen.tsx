@@ -10,7 +10,7 @@ import { speakKidPrompt } from '../audio/speakPrompt';
 import { StatusBanner } from '../components/StatusBanner';
 import { HOME_TASKS } from '../data/homeTasks';
 import { albumWord } from '../data/friendsUnit';
-import { familyStatus } from '../data/learning';
+import { familyStatus, practiceDay, type LearningNote, type PracticeDay } from '../data/learning';
 import type { Language } from '../i18n';
 import { useT } from '../i18n';
 import { isDeviceTurkish } from '../i18n/deviceLocale';
@@ -66,6 +66,7 @@ export function SettingsScreen({ navigation }: Props) {
     declineReplay,
     homeTasks,
     markHomeTask,
+    recentLearning,
   } = useGame();
   const [ageDraft, setAgeDraft] = useState(childAge ?? 5);
   const [gate, setGate] = useState<GateKind>(null);
@@ -199,24 +200,68 @@ export function SettingsScreen({ navigation }: Props) {
     setLanguage(lang);
   };
 
+  const statusKeyFor = (status: ReturnType<typeof familyStatus>) =>
+    status === 'recalled'
+      ? 'settings.statusRecalled'
+      : status === 'solo'
+        ? 'settings.statusSolo'
+        : status === 'seen'
+          ? 'settings.statusSeen'
+          : status === 'helped'
+            ? 'settings.statusHelped'
+            : 'settings.statusMet';
+
+  const wordName = (id: string) => {
+    const word = albumWord(id);
+    if (!word) return null;
+    return language === 'tr' ? `${word.en} · ${word.tr}` : word.en;
+  };
+
+  const practiceNotes: LearningNote[] = recentLearning.length
+    ? recentLearning
+    : Object.values(wordProgress)
+        .filter((stat) => stat.attempts > 0 && stat.lastAt > 0 && stat.skill !== 'count-quantity' && !stat.id.startsWith('room.'))
+        .map((stat) => ({
+          id: stat.id,
+          at: stat.lastAt,
+          correct: stat.independent + stat.hinted > 0,
+          independent: stat.independent > 0 && stat.skill !== 'picture-match',
+          skill: stat.skill,
+        }));
+
+  const practiceRows = practiceNotes
+    .slice()
+    .sort((a, b) => b.at - a.at)
+    .flatMap((note) => {
+      const name = wordName(note.id);
+      if (!name) return [];
+      const day = practiceDay(note.at);
+      const statusKey = note.skill === 'picture-match'
+        ? 'settings.statusSeen'
+        : note.independent
+          ? 'settings.statusSolo'
+          : note.correct
+            ? 'settings.statusHelped'
+            : 'settings.statusMet';
+      return [{ id: `${note.id}-${note.at}`, name, statusKey, day } as const];
+    })
+    .slice(0, 6);
+
+  const practiceGroups = (['today', 'yesterday', 'earlier'] as PracticeDay[])
+    .map((day) => ({
+      day,
+      rows: practiceRows.filter((row) => row.day === day),
+    }))
+    .filter((group) => group.rows.length > 0);
+
   const familyRows = Object.values(wordProgress)
     .filter((stat) => stat.attempts > 0 && stat.skill !== 'count-quantity' && !stat.id.startsWith('room.'))
     .sort((a, b) => b.lastAt - a.lastAt)
     .slice(0, 6)
     .flatMap((stat) => {
-      const word = albumWord(stat.id);
-      if (!word) return [];
-      const status = familyStatus(stat);
-      const statusKey =
-        status === 'recalled'
-          ? 'settings.statusRecalled'
-          : status === 'solo'
-            ? 'settings.statusSolo'
-            : status === 'helped'
-              ? 'settings.statusHelped'
-              : 'settings.statusMet';
-      const name = language === 'tr' ? `${word.en} · ${word.tr}` : word.en;
-      return [{ id: stat.id, name, statusKey } as const];
+      const name = wordName(stat.id);
+      if (!name) return [];
+      return [{ id: stat.id, name, statusKey: statusKeyFor(familyStatus(stat)) } as const];
     });
 
   return (
@@ -354,12 +399,29 @@ export function SettingsScreen({ navigation }: Props) {
 
           <FadeInView delay={70} style={styles.card}>
             <Text style={styles.h}>{t('settings.familyTitle')}</Text>
-            {familyRows.length === 0 ? <Text style={styles.sub}>{t('settings.familyEmpty')}</Text> : null}
-            {familyRows.map((row) => (
-              <Text key={row.id} style={styles.sub}>
-                {row.name} · {t(row.statusKey)}
-              </Text>
+            {practiceGroups.length === 0 ? <Text style={styles.sub}>{t('settings.familyEmpty')}</Text> : null}
+            {practiceGroups.map((group) => (
+              <View key={group.day}>
+                <Text style={styles.sub}>
+                  {t(group.day === 'today' ? 'settings.dayToday' : group.day === 'yesterday' ? 'settings.dayYesterday' : 'settings.dayEarlier')}
+                </Text>
+                {group.rows.map((row) => (
+                  <Text key={row.id} style={styles.sub}>
+                    {row.name} · {t(row.statusKey)}
+                  </Text>
+                ))}
+              </View>
             ))}
+            {familyRows.length > 0 ? (
+              <View style={{ marginTop: 12 }}>
+                <Text style={styles.h}>{t('settings.statusTitle')}</Text>
+                {familyRows.map((row) => (
+                  <Text key={row.id} style={styles.sub}>
+                    {row.name} · {t(row.statusKey)}
+                  </Text>
+                ))}
+              </View>
+            ) : null}
             {replayOffer ? (
               <View style={{ marginTop: 12 }}>
                 <Text style={styles.h}>{t('settings.replayTitle')}</Text>

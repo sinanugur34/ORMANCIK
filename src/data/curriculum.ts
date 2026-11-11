@@ -12,6 +12,8 @@ export type CurriculumInput = {
   friendsIntro?: boolean;
   legacyLevelIds?: number[];
   replayOffer?: boolean;
+  /** Set when a grown-up answers the replay question. Absent means it is still open. */
+  replayDecision?: 'accept' | 'decline';
 };
 
 export type CurriculumResult = {
@@ -27,6 +29,7 @@ export type CurriculumResult = {
    * grown-up may replay. Coins and words stay either way.
    */
   replayOffer: boolean;
+  replayDecision?: 'accept' | 'decline';
 };
 
 function friendClears(ids: number[]): number[] {
@@ -46,8 +49,28 @@ function kept(raw: CurriculumInput, clearedLevelIds: number[], levelStars: Recor
     contentVersion: raw.contentVersion && raw.contentVersion > CURRICULUM_VERSION ? raw.contentVersion : CURRICULUM_VERSION,
     friendsIntro: raw.friendsIntro ?? false,
     legacyLevelIds,
-    replayOffer: raw.replayOffer ?? false,
+    replayOffer: raw.replayDecision ? false : (raw.replayOffer ?? false),
+    replayDecision: raw.replayDecision,
   };
+}
+
+/**
+ * The loader must pass the stored offer through. A version-3 profile with
+ * `replayOffer: false` and no decision is left alone: that shape is also a
+ * child who finished the new lessons, and a declined offer. Wiping every
+ * version-3 clear would be the wrong repair.
+ */
+export function loadCurriculum(raw: CurriculumInput): CurriculumResult {
+  return migrateCurriculum({
+    clearedLevelIds: raw.clearedLevelIds,
+    levelStars: raw.levelStars,
+    wordProgress: raw.wordProgress,
+    contentVersion: raw.contentVersion,
+    friendsIntro: raw.friendsIntro,
+    legacyLevelIds: raw.legacyLevelIds,
+    replayOffer: raw.replayOffer,
+    replayDecision: raw.replayDecision,
+  });
 }
 
 export function migrateCurriculum(raw: CurriculumInput): CurriculumResult {
@@ -67,6 +90,7 @@ export function migrateCurriculum(raw: CurriculumInput): CurriculumResult {
       friendsIntro: raw.friendsIntro ?? false,
       legacyLevelIds,
       replayOffer: ambiguous,
+      replayDecision: undefined,
     };
   }
 
@@ -79,6 +103,7 @@ export function migrateCurriculum(raw: CurriculumInput): CurriculumResult {
       friendsIntro: false,
       legacyLevelIds,
       replayOffer: false,
+      replayDecision: undefined,
     };
   }
 
@@ -90,6 +115,7 @@ export function migrateCurriculum(raw: CurriculumInput): CurriculumResult {
     friendsIntro: true,
     legacyLevelIds: Array.from(new Set([...legacyLevelIds, ...legacy])),
     replayOffer: false,
+    replayDecision: undefined,
   };
 }
 
@@ -102,12 +128,13 @@ export function acceptFriendsReplay(raw: CurriculumResult): CurriculumResult {
     legacyLevelIds: Array.from(new Set([...raw.legacyLevelIds, ...legacy])),
     friendsIntro: true,
     replayOffer: false,
+    replayDecision: 'accept',
     contentVersion: CURRICULUM_VERSION,
   };
 }
 
 export function declineFriendsReplay(raw: CurriculumResult): CurriculumResult {
-  return { ...raw, replayOffer: false, contentVersion: CURRICULUM_VERSION };
+  return { ...raw, replayOffer: false, replayDecision: 'decline', contentVersion: CURRICULUM_VERSION };
 }
 
 export function saveNeedsRepairCopy(parsed: {
