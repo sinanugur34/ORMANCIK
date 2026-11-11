@@ -344,6 +344,7 @@ export const en: Record<TrKey, string> = {
   'album.empty': 'Not practiced yet',
   'album.due': 'time to review',
   'album.stats': 'Heard {heard} · picture {seen} · hinted {hinted} · tries {attempts}',
+  'album.statsCount': 'Counting · correct {correct} · tries {attempts}',
   'album.attemptsNote': 'A try is every answer, including a wrong one. Independent counts only correct answers without help.',
   'album.listen': 'Hear it',
   'album.skillCount': 'This is a counting record. The English number word is measured separately.',

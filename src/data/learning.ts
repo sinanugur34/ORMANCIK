@@ -209,8 +209,22 @@ export function knownWordIds(progress: Record<string, WordStat | undefined>, now
     .map((stat) => stat.id);
 }
 
+/** Unaided picture matches. Counting successes and heard answers stay in their own counts. */
 export function pictureIndependentCount(stat: WordStat): number {
+  if (stat.skill === 'count-quantity' || stat.id.startsWith('count-')) return 0;
   return Math.max(0, stat.independent - heardIndependentCount(stat));
+}
+
+/** One row when a save has word totals but no per-attempt notes. An unaided picture match stays unaided. */
+export function practiceNoteFromStat(stat: WordStat): LearningNote {
+  return {
+    eventId: `legacy-${stat.id}-${stat.lastAt}`,
+    id: stat.id,
+    at: stat.lastAt,
+    correct: stat.independent + stat.hinted > 0,
+    independent: stat.independent > 0,
+    skill: stat.skill,
+  };
 }
 
 /** What a family can honestly say. One sitting, or a silent match, is not "remembered later". */
@@ -269,7 +283,7 @@ function combineStats(a: WordStat, b: WordStat): WordStat {
     lastIndependentDay: Math.max(a.lastIndependentDay ?? 0, b.lastIndependentDay ?? 0),
     lastIndependentAt: Math.max(a.lastIndependentAt ?? 0, b.lastIndependentAt ?? 0),
     lastSessionId: (a.lastIndependentAt ?? 0) >= (b.lastIndependentAt ?? 0) ? (a.lastSessionId ?? 0) : (b.lastSessionId ?? 0),
-    heardIndependent: Math.max(a.heardIndependent ?? 0, b.heardIndependent ?? 0),
+    heardIndependent: (a.heardIndependent ?? 0) + (b.heardIndependent ?? 0),
     transferIndependent: Math.max(a.transferIndependent ?? 0, b.transferIndependent ?? 0),
   };
 }

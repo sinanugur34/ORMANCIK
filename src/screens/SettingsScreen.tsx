@@ -10,7 +10,7 @@ import { speakKidPrompt } from '../audio/speakPrompt';
 import { StatusBanner } from '../components/StatusBanner';
 import { HOME_TASKS } from '../data/homeTasks';
 import { albumWord } from '../data/friendsUnit';
-import { familyStatus, practiceDay, practiceResult, type LearningNote, type PracticeDay } from '../data/learning';
+import { familyStatus, practiceDay, practiceNoteFromStat, practiceResult, type LearningNote, type PracticeDay } from '../data/learning';
 import type { Language } from '../i18n';
 import { useT } from '../i18n';
 import { isDeviceTurkish } from '../i18n/deviceLocale';
@@ -221,14 +221,7 @@ export function SettingsScreen({ navigation }: Props) {
     ? recentLearning
     : Object.values(wordProgress)
         .filter((stat) => stat.attempts > 0 && stat.lastAt > 0 && stat.skill !== 'count-quantity' && !stat.id.startsWith('room.'))
-        .map((stat) => ({
-          eventId: `legacy-${stat.id}-${stat.lastAt}`,
-          id: stat.id,
-          at: stat.lastAt,
-          correct: stat.independent + stat.hinted > 0,
-          independent: stat.independent > 0 && stat.skill !== 'picture-match',
-          skill: stat.skill,
-        }));
+        .map(practiceNoteFromStat);
 
   const practiceRows = practiceNotes
     .slice()

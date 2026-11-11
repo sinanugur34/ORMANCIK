@@ -364,6 +364,7 @@ export const tr = {
   'album.empty': 'Henüz çalışılmadı',
   'album.due': 'tekrar zamanı',
   'album.stats': 'Duyarak {heard} · resme bakarak {seen} · ipuçlu {hinted} · deneme {attempts}',
+  'album.statsCount': 'Sayma · doğru {correct} · deneme {attempts}',
   'album.attemptsNote': 'Deneme, yanlışlar dahil her giriştir. Yardımsız sayı yalnızca yardımsız doğru cevapları sayar.',
   'album.listen': 'Dinle',
   'album.skillCount': 'Bu bir sayma kaydı. İngilizce sayı sözcüğü ayrıca ölçülür.',

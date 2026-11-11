@@ -87,12 +87,14 @@ export function WordAlbumScreen({ navigation }: Props) {
                 {counting ? <Text style={styles.meta}>{t('album.skillCount')}</Text> : null}
                 {stat ? (
                   <Text style={styles.meta}>
-                    {t('album.stats', {
-                      heard: heardIndependentCount(stat),
-                      seen: pictureIndependentCount(stat),
-                      hinted: stat.hinted,
-                      attempts: stat.attempts,
-                    })}
+                    {counting
+                      ? t('album.statsCount', { correct: stat.independent, attempts: stat.attempts })
+                      : t('album.stats', {
+                          heard: heardIndependentCount(stat),
+                          seen: pictureIndependentCount(stat),
+                          hinted: stat.hinted,
+                          attempts: stat.attempts,
+                        })}
                     {due ? ` · ${t('album.due')}` : ''}
                   </Text>
                 ) : (

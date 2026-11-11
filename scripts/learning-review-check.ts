@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { animalRoundsFor, colorRoundsFor, shapeRoundsFor } from '../src/data/activityRounds';
 import { acceptFriendsReplay, declineFriendsReplay, loadCurriculum, migrateCurriculum } from '../src/data/curriculum';
 import { albumWord, buildFriendsLevel, buildReviewLevel } from '../src/data/friendsUnit';
-import { appendLearningNotes, applyAttempt, commitAttempts, familyStatus, heardIndependentCount, knownWordIds, localDayStamp, mergeWordProgress, practiceDay, practiceResult, skillAfterPrompt } from '../src/data/learning';
+import { appendLearningNotes, applyAttempt, commitAttempts, familyStatus, heardIndependentCount, knownWordIds, localDayStamp, mergeWordProgress, pictureIndependentCount, practiceDay, practiceNoteFromStat, practiceResult, skillAfterPrompt } from '../src/data/learning';
 import { buildLevel } from '../src/data/levels';
 import { buildRounds, orderByNeed, shapePixelSize } from '../src/data/rounds';
 
@@ -121,6 +121,9 @@ const heard = applyAttempt(
 assert.equal(counted.skill, 'count-quantity');
 assert.equal(heard.skill, 'listen-recognize');
 assert.notEqual(counted.id, heard.id);
+assert.equal(heardIndependentCount(counted), 0);
+assert.equal(pictureIndependentCount(counted), 0);
+assert.equal(counted.independent, 1);
 
 const pixels = [0.62, 1.05, 1.55].map(shapePixelSize);
 assert.ok(pixels[1]! - pixels[0]! >= 12);
@@ -191,6 +194,8 @@ assert.equal(merged.berry, undefined);
 assert.equal(merged['color.red']?.attempts, 6);
 assert.equal(merged['color.red']?.independent, 3);
 assert.equal(merged['color.red']?.reviewAt, 5);
+assert.equal(heardIndependentCount(merged['color.red']!), 3);
+assert.equal(pictureIndependentCount(merged['color.red']!), 0);
 assert.equal(merged['color.pink']?.attempts, 1);
 assert.equal(merged.cat?.independent, 3);
 
@@ -369,6 +374,40 @@ const lessonNotes = appendLearningNotes(
 assert.equal(new Set(lessonNotes.map((note) => note.eventId)).size, 3);
 assert.deepEqual(lessonNotes.map(practiceResult), ['tried', 'helped-seen', 'seen']);
 assert.equal(practiceResult({ correct: false, independent: false, skill: 'listen-recognize', eventId: 'a', id: 'cat', at: 1 }), 'tried');
+const quietStat = silentPair.cat;
+assert.equal(practiceResult(practiceNoteFromStat(quietStat)), 'seen');
+const helpedPicture = applyAttempt(
+  undefined,
+  { id: 'dog', skill: 'picture-match', independent: false, firstTry: false, correct: true },
+  clock,
+);
+assert.equal(practiceResult(practiceNoteFromStat(helpedPicture)), 'helped-seen');
+const folded = mergeWordProgress({
+  red: {
+    id: 'red',
+    skill: 'picture-match',
+    independent: 2,
+    hinted: 0,
+    firstTry: 2,
+    attempts: 2,
+    lastAt: 10,
+    reviewAt: 20,
+    heardIndependent: 0,
+  },
+  'color.red': {
+    id: 'color.red',
+    skill: 'listen-recognize',
+    independent: 2,
+    hinted: 0,
+    firstTry: 2,
+    attempts: 2,
+    lastAt: 30,
+    reviewAt: 40,
+    heardIndependent: 2,
+  },
+});
+assert.equal(heardIndependentCount(folded['color.red']!), 2);
+assert.equal(pictureIndependentCount(folded['color.red']!), 2);
 
 const withoutRoom = mergeWordProgress({
   'room.hat': {
