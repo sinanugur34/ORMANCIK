@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   FadeIn,
   ZoomIn,
@@ -9,16 +9,22 @@ import Animated, {
   withSpring,
 } from 'react-native-reanimated';
 import { speakKidPrompt, speakPraise, stopSpeaking } from '../audio/speakPrompt';
-import { useT } from '../i18n';
+import { tFor, useT } from '../i18n';
+import type { WordAttempt } from '../data/learning';
 import { LevelDef, starsFromMistakes } from '../data/levels';
 import { AgeBand, colors } from '../theme/colors';
+import { colorName } from '../theme/colorNames';
+import { LessonPlay } from './LessonPlay';
+import { ListenBar } from './ListenBar';
+import type { LevelWin } from './levelWin';
 import { BouncePress } from './Motion';
 import { SparkleBurst } from './SparkleBurst';
 
 type Props = {
   level: LevelDef;
   band: AgeBand;
-  onWin: (stars: 1 | 2 | 3) => void;
+  hintsEnabled: boolean;
+  onWin: (result: LevelWin) => void;
 };
 
 function shuffle<T>(arr: T[]): T[] {
@@ -36,9 +42,10 @@ function btnSize(band: AgeBand): number {
   return 70;
 }
 
-export function LevelPlay({ level, band, onWin }: Props) {
+function ArcadeLevel({ level, band, hintsEnabled, onWin }: Props) {
   const t = useT();
   const [feedback, setFeedback] = useState<'idle' | 'good' | 'bad'>('idle');
+  const [coach, setCoach] = useState<string | null>(null);
   const [burst, setBurst] = useState(false);
   const [progress, setProgress] = useState(0);
   const [mistakes, setMistakes] = useState(0);
@@ -50,30 +57,57 @@ export function LevelPlay({ level, band, onWin }: Props) {
   const [pathLit, setPathLit] = useState<number[]>([]);
   const [memoryFlipped, setMemoryFlipped] = useState<number[]>([]);
   const [memoryMatched, setMemoryMatched] = useState<number[]>([]);
+  const [animalCursor, setAnimalCursor] = useState(0);
+  const [animalHelp, setAnimalHelp] = useState(false);
   const pop = useSharedValue(1);
   const size = btnSize(band);
   const showLabels = band !== '9-10' || level.template === 'shapeSort';
+  const settled = useRef(false);
+  const mistakesRef = useRef(0);
+  const comparingMemory = useRef(false);
+  const flippedRef = useRef<number[]>([]);
+  const matchedRef = useRef<number[]>([]);
+  const animalHelpUsed = useRef(false);
+  const animalMissed = useRef(false);
+  const wordLog = useRef<WordAttempt[]>([]);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
+    settled.current = false;
+    mistakesRef.current = 0;
+    comparingMemory.current = false;
+    flippedRef.current = [];
+    matchedRef.current = [];
+    animalHelpUsed.current = false;
+    animalMissed.current = false;
+    wordLog.current = [];
     setProgress(0);
     setMistakes(0);
     setSortDone([]);
     setActiveBin(0);
     setFeedback('idle');
+    setCoach(null);
     setBurst(false);
     setSeqStep(0);
     setPathStep(0);
     setPathLit([]);
     setMemoryFlipped([]);
     setMemoryMatched([]);
+    setAnimalCursor(0);
+    setAnimalHelp(false);
+    return () => {
+      timers.current.forEach(clearTimeout);
+      timers.current = [];
+    };
   }, [level.id]);
 
   useEffect(() => {
-    void speakKidPrompt(level.prompt);
+    const english = level.template === 'animalMatch';
+    void speakKidPrompt(level.prompt, english ? { lang: 'en' } : undefined);
     return () => {
       void stopSpeaking();
     };
-  }, [level.id, level.prompt]);
+  }, [level.id, level.prompt, level.template]);
 
   useEffect(() => {
     if (!level.timerSec) return;
@@ -177,7 +211,11 @@ export function LevelPlay({ level, band, onWin }: Props) {
     return shuffle(level.animals.slice(0, n));
   }, [level.id, level.animals, band]);
 
-  const targetAnimal = level.animals[0];
+  const animalGoal = Math.max(1, Math.min(need, Math.max(animalOptions.length, 1)));
+  const targetAnimal = animalOptions[Math.min(animalCursor, Math.max(animalOptions.length - 1, 0))];
+  const animalPrompt = targetAnimal
+    ? `Find the ${tFor('en', targetAnimal.labelKey).toLowerCase()}.`
+    : level.prompt;
 
   const pathStones = useMemo(() => {
     const n = level.pathLength ?? (band === '6-8' ? 3 : 4);
@@ -211,9 +249,19 @@ export function LevelPlay({ level, band, onWin }: Props) {
     return shuffle(items);
   }, [level.id, level.findGridSize, level.animals, level.shapes, level.colors, band]);
 
+  const later = (fn: () => void, ms: number) => {
+    const id = setTimeout(fn, ms);
+    timers.current.push(id);
+  };
+
+  const locked = () => settled.current;
+
   const finish = () => {
-    const stars = starsFromMistakes(mistakes, band);
-    setTimeout(() => onWin(stars), 420);
+    if (settled.current) return;
+    settled.current = true;
+    const stars = starsFromMistakes(mistakesRef.current, band);
+    const payload: LevelWin = { stars, words: [...wordLog.current] };
+    later(() => onWin(payload), 420);
   };
 
   const flash = (ok: boolean) => {
@@ -224,18 +272,25 @@ export function LevelPlay({ level, band, onWin }: Props) {
       withSpring(1, { damping: 12, stiffness: 200 }),
     );
     if (ok) void speakPraise();
-    if (!ok) setMistakes((m) => m + 1);
+    if (!ok) {
+      mistakesRef.current += 1;
+      setMistakes(mistakesRef.current);
+      setCoach(t('level.modelHint'));
+    } else {
+      setCoach(null);
+    }
     setTimeout(() => {
       setFeedback('idle');
       setBurst(false);
     }, 520);
   };
 
-  const bumpProgress = () => {
+  const bumpProgress = (goal = need) => {
+    if (settled.current) return;
     setProgress((p) => {
-      if (p >= need) return p;
+      if (settled.current || p >= goal) return p;
       const next = p + 1;
-      if (next >= need) finish();
+      if (next >= goal) finish();
       return next;
     });
   };
@@ -244,7 +299,13 @@ export function LevelPlay({ level, band, onWin }: Props) {
     transform: [{ scale: pop.value }],
   }));
 
+  useEffect(() => {
+    if (level.template !== 'animalMatch' || animalCursor === 0) return;
+    void speakKidPrompt(animalPrompt, { lang: 'en' });
+  }, [animalCursor, animalPrompt, level.template]);
+
   const onColor = (c: string) => {
+    if (locked()) return;
     if (c === targetColor) {
       flash(true);
       bumpProgress();
@@ -252,6 +313,7 @@ export function LevelPlay({ level, band, onWin }: Props) {
   };
 
   const onShape = (glyph: string) => {
+    if (locked()) return;
     if (glyph === targetShape) {
       flash(true);
       bumpProgress();
@@ -259,6 +321,7 @@ export function LevelPlay({ level, band, onWin }: Props) {
   };
 
   const onSeq = (c: string) => {
+    if (locked()) return;
     if (c === sequence[seqStep]) {
       flash(true);
       const next = seqStep + 1;
@@ -273,25 +336,38 @@ export function LevelPlay({ level, band, onWin }: Props) {
   };
 
   const onMemory = (index: number) => {
-    if (memoryMatched.includes(index) || memoryFlipped.includes(index)) return;
-    const next = [...memoryFlipped, index];
+    if (locked() || comparingMemory.current) return;
+    if (matchedRef.current.includes(index) || flippedRef.current.includes(index)) return;
+    const next = [...flippedRef.current, index];
+    if (next.length > 2) return;
+    flippedRef.current = next;
     setMemoryFlipped(next);
-    if (next.length === 2) {
-      const [a, b] = next;
-      if (memoryCards[a].color === memoryCards[b].color) {
-        flash(true);
-        const matched = [...memoryMatched, a, b];
-        setMemoryMatched(matched);
+    if (next.length < 2) return;
+    comparingMemory.current = true;
+    const [a, b] = next;
+    if (memoryCards[a].color === memoryCards[b].color) {
+      flash(true);
+      const matched = [...matchedRef.current, a, b];
+      matchedRef.current = matched;
+      setMemoryMatched(matched);
+      later(() => {
+        flippedRef.current = [];
         setMemoryFlipped([]);
-        if (matched.length >= memoryCards.length) finish();
-      } else {
-        flash(false);
-        setTimeout(() => setMemoryFlipped([]), 520);
-      }
+        comparingMemory.current = false;
+      }, 420);
+      if (matched.length >= memoryCards.length) finish();
+    } else {
+      flash(false);
+      later(() => {
+        flippedRef.current = [];
+        setMemoryFlipped([]);
+        comparingMemory.current = false;
+      }, 520);
     }
   };
 
   const onCount = (n: number) => {
+    if (locked()) return;
     if (n === need) {
       flash(true);
       finish();
@@ -299,6 +375,7 @@ export function LevelPlay({ level, band, onWin }: Props) {
   };
 
   const onSize = (item: (typeof sizeItems)[0]) => {
+    if (locked()) return;
     const ok = level.findBigger ? item.isBiggest : item.isSmallest;
     if (ok) {
       flash(true);
@@ -307,6 +384,7 @@ export function LevelPlay({ level, band, onWin }: Props) {
   };
 
   const onPattern = (c: string) => {
+    if (locked()) return;
     if (c === level.patternAnswer) {
       flash(true);
       bumpProgress();
@@ -314,6 +392,7 @@ export function LevelPlay({ level, band, onWin }: Props) {
   };
 
   const onSortItem = (item: (typeof sortItems.items)[0]) => {
+    if (locked()) return;
     if (sortDone.includes(item.id)) return;
     if (item.bin === activeBin) {
       flash(true);
@@ -332,6 +411,7 @@ export function LevelPlay({ level, band, onWin }: Props) {
   };
 
   const onOdd = (odd: boolean) => {
+    if (locked()) return;
     if (odd) {
       flash(true);
       finish();
@@ -339,13 +419,32 @@ export function LevelPlay({ level, band, onWin }: Props) {
   };
 
   const onAnimal = (emoji: string) => {
-    if (emoji === targetAnimal?.emoji) {
+    if (locked() || !targetAnimal) return;
+    const wordId = targetAnimal.labelKey.replace(/^animal\./, '');
+    if (emoji === targetAnimal.emoji) {
       flash(true);
-      bumpProgress();
-    } else flash(false);
+      wordLog.current.push({
+        id: wordId,
+        independent: !animalHelpUsed.current,
+        firstTry: !animalMissed.current && !animalHelpUsed.current,
+      });
+      animalHelpUsed.current = false;
+      animalMissed.current = false;
+      setAnimalHelp(false);
+      setAnimalCursor((c) => c + 1);
+      bumpProgress(animalGoal);
+    } else {
+      animalMissed.current = true;
+      animalHelpUsed.current = true;
+      setAnimalHelp(true);
+      flash(false);
+      const name = tFor('en', targetAnimal.labelKey);
+      void speakKidPrompt(`${name}. This is a ${name.toLowerCase()}.`, { lang: 'en', slow: true });
+    }
   };
 
   const onPath = (c: string) => {
+    if (locked()) return;
     if (c === pathStones[pathStep]) {
       flash(true);
       const lit = [...pathLit, pathStep];
@@ -364,6 +463,7 @@ export function LevelPlay({ level, band, onWin }: Props) {
   };
 
   const onQuickFind = (isTarget: boolean) => {
+    if (locked()) return;
     if (isTarget) {
       flash(true);
       finish();
@@ -372,6 +472,12 @@ export function LevelPlay({ level, band, onWin }: Props) {
 
   const softProgress = band === '3-5';
   const animalSize = band === '3-5' ? Math.max(size, 104) : size;
+  const memoryPairs = Math.max(1, memoryCards.length / 2);
+  const singleShot =
+    level.template === 'quickFind' || level.template === 'oddOneOut' || level.template === 'countCollect';
+  const goal = level.template === 'memory' ? memoryPairs : level.template === 'animalMatch' ? animalGoal : singleShot ? 1 : need;
+  const shownProgress = level.template === 'memory' ? memoryMatched.length / 2 : progress;
+  const spokenPrompt = level.template === 'animalMatch' ? animalPrompt : level.prompt;
 
   return (
     <Animated.View
@@ -390,8 +496,9 @@ export function LevelPlay({ level, band, onWin }: Props) {
       <SparkleBurst active={burst && feedback === 'bad'} tone="bad" count={6} />
 
       <Animated.Text entering={FadeIn} style={[styles.prompt, softProgress && styles.promptSoft]}>
-        {level.prompt}
+        {spokenPrompt}
       </Animated.Text>
+      <ListenBar text={spokenPrompt} lang={level.template === 'animalMatch' ? 'en' : undefined} />
 
       {level.timerSec ? (
         <View style={styles.timerPill}>
@@ -401,14 +508,14 @@ export function LevelPlay({ level, band, onWin }: Props) {
 
       {!softProgress ? (
         <Text style={styles.progress}>
-          {t('level.progress', { progress, need, reward: level.reward })}
+          {t('level.progress', { progress: shownProgress, need: goal, reward: level.reward })}
         </Text>
       ) : (
         <View style={styles.dotsRow}>
-          {Array.from({ length: need }).map((_, i) => (
+          {Array.from({ length: Math.max(1, Math.round(goal)) }).map((_, i) => (
             <View
               key={i}
-              style={[styles.progDot, i < progress && styles.progDotOn]}
+              style={[styles.progDot, i < shownProgress && styles.progDotOn]}
             />
           ))}
         </View>
@@ -419,7 +526,7 @@ export function LevelPlay({ level, band, onWin }: Props) {
           entering={ZoomIn.springify()}
           style={[styles.fb, feedback === 'good' ? styles.fbGood : styles.fbBad]}
         >
-          {feedback === 'good' ? t('level.feedbackGood') : t('level.feedbackBad')}
+          {feedback === 'good' ? t('level.feedbackGood') : coach ?? t('level.modelHint')}
         </Animated.Text>
       ) : (
         <View style={{ height: 32 }} />
@@ -436,8 +543,10 @@ export function LevelPlay({ level, band, onWin }: Props) {
           />
           <View style={styles.row}>
             {colorOptions.map((c) => (
-              <BouncePress
+              <Pressable
                 key={c}
+                accessibilityRole="button"
+                accessibilityLabel={colorName(c, 'en')}
                 onPress={() => onColor(c)}
                 style={[styles.swatchBig, { backgroundColor: c, width: size, height: size, borderRadius: size * 0.28 }]}
               />
@@ -680,16 +789,20 @@ export function LevelPlay({ level, band, onWin }: Props) {
 
       {level.template === 'animalMatch' && targetAnimal ? (
         <View style={styles.grid}>
-          <View style={styles.animalHero}>
-            <Text style={styles.animalHeroEmoji}>{targetAnimal.emoji}</Text>
-            {band !== '9-10' ? (
-              <Text style={styles.animalHeroLabel}>{targetAnimal.label}</Text>
-            ) : null}
-          </View>
+          {animalHelp ? (
+            <View style={styles.animalHero}>
+              <Text style={styles.animalHeroEmoji}>{targetAnimal.emoji}</Text>
+              {hintsEnabled ? (
+                <Text style={styles.animalHeroLabel}>{tFor('tr', targetAnimal.labelKey)}</Text>
+              ) : null}
+            </View>
+          ) : null}
           <View style={styles.row}>
             {animalOptions.map((a) => (
-              <BouncePress
-                key={a.emoji}
+              <Pressable
+                key={`${animalCursor}-${a.emoji}`}
+                accessibilityRole="button"
+                accessibilityLabel={tFor('en', a.labelKey)}
                 onPress={() => onAnimal(a.emoji)}
                 style={[
                   styles.animalCard,
@@ -701,9 +814,20 @@ export function LevelPlay({ level, band, onWin }: Props) {
                 ]}
               >
                 <Text style={styles.animalCardEmoji}>{a.emoji}</Text>
-              </BouncePress>
+              </Pressable>
             ))}
           </View>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              animalHelpUsed.current = true;
+              setAnimalHelp(true);
+              void speakKidPrompt(animalPrompt, { lang: 'en', slow: true });
+            }}
+            style={styles.helpBtn}
+          >
+            <Text style={styles.helpText}>{t('level.help')}</Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -797,9 +921,10 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 3,
     borderColor: 'transparent',
-    minHeight: 280,
-    overflow: 'hidden',
+    overflow: 'visible',
   },
+  helpBtn: { alignSelf: 'center', marginTop: 14, minHeight: 44, justifyContent: 'center' },
+  helpText: { fontWeight: '800', color: colors.forest, fontSize: 16 },
   wrapGood: { backgroundColor: 'rgba(60,179,113,0.12)' },
   wrapBad: { backgroundColor: 'rgba(255,107,107,0.1)' },
   prompt: {
@@ -1035,3 +1160,17 @@ const styles = StyleSheet.create({
   },
   quickCellEmoji: { fontSize: 28 },
 });
+
+export function LevelPlay(props: Props) {
+  if (props.level.lesson && props.level.lesson.length > 0) {
+    return (
+      <LessonPlay
+        level={props.level}
+        band={props.band}
+        hintsEnabled={props.hintsEnabled}
+        onWin={props.onWin}
+      />
+    );
+  }
+  return <ArcadeLevel {...props} />;
+}

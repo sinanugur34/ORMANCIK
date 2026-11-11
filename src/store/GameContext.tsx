@@ -5,6 +5,7 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { setVoiceNarrationEnabled } from '../audio/speakPrompt';
@@ -12,11 +13,14 @@ import { COSMETICS } from '../data/cosmetics';
 import { TOTAL_LEVELS } from '../data/islands';
 import { isDeviceTurkish } from '../i18n/deviceLocale';
 import { setLanguage as setI18nLanguage, t, type Language } from '../i18n';
+import { applyAttempt, type EnglishLevel, type WordAttempt, type WordStat } from '../data/learning';
 import { ageToBand, AgeBand } from '../theme/colors';
 
 const STORAGE_KEY = 'ormancik-v1';
+const BACKUP_KEY = 'ormancik-v1-backup';
 /** Legacy key from Tiny Grove branding — migrated once into STORAGE_KEY. */
 const LEGACY_STORAGE_KEY = 'tiny-grove-v1';
+const PARENT_SESSION_MS = 5 * 60 * 1000;
 export const MAX_PROFILES = 4;
 export const PROFILE_NAME_MAX = 12;
 
@@ -39,6 +43,14 @@ export type ChildProfile = {
   equipped: Equipped;
   clearedLevelIds: number[];
   highestUnlocked: number;
+  /** Turkish gloss available as an optional hint. Learning targets stay English. */
+  hintsEnabled: boolean;
+  /** Starting point for English. New profiles begin at "new", not a fast track. */
+  englishLevel: EnglishLevel;
+  wordProgress: Record<string, WordStat>;
+  /** Levels before a gentle break prompt. 0 disables it. */
+  sessionLimit: number;
+  levelStars: Record<string, 1 | 2 | 3>;
 };
 
 type DevicePersisted = {
@@ -55,6 +67,9 @@ type DevicePersisted = {
    * devices are silently set to English. Existing saves migrate to true.
    */
   languageChosen: boolean;
+  /** Local 4-digit grown-up PIN. Not an account password. */
+  parentPin: string | null;
+  parentUnlockedUntil: number;
 };
 
 /** Legacy single-age save shape (pre multi-profile). */
@@ -65,6 +80,7 @@ type LegacyPersisted = {
   voiceEnabled?: boolean;
   language?: Language;
   languageChosen?: boolean;
+  parentPin?: string | null;
   ownedCosmeticIds?: string[];
   equipped?: Partial<Equipped>;
   clearedLevelIds?: number[];
@@ -106,9 +122,26 @@ type GameContextValue = {
   chooseLanguage: (lang: Language) => void;
   ownCosmetic: (id: string) => void;
   equipCosmetic: (id: string) => void;
-  clearLevel: (levelId: number, reward: number) => void;
+  clearLevel: (levelId: number, reward: number, stars?: 1 | 2 | 3) => number;
+  recordLearning: (attempts: WordAttempt[]) => void;
   isLevelUnlocked: (levelId: number) => boolean;
   resetProgress: () => void;
+  hintsEnabled: boolean;
+  englishLevel: EnglishLevel;
+  wordProgress: Record<string, WordStat>;
+  sessionLimit: number;
+  sittingCount: number;
+  dismissSitting: () => void;
+  setHintsEnabled: (v: boolean) => void;
+  setEnglishLevel: (level: EnglishLevel) => void;
+  setSessionLimit: (n: number) => void;
+  addCoinsToProfile: (profileId: string, n: number) => void;
+  parentPinSet: boolean;
+  parentUnlockedUntil: number;
+  saveWarning: boolean;
+  setParentPin: (pin: string) => boolean;
+  verifyParentPin: (pin: string) => 'ok' | 'wrong' | 'locked';
+  unlockParent: () => void;
 };
 
 const starterOwned = COSMETICS.filter((c) => c.starter).map((c) => c.id);
@@ -131,6 +164,8 @@ const defaultDevice: DevicePersisted = {
   voiceEnabled: true,
   language: 'tr',
   languageChosen: false,
+  parentPin: null,
+  parentUnlockedUntil: 0,
 };
 
 /** Fresh install: TR devices wait for LanguageGate; all others start in English. */
@@ -155,18 +190,32 @@ function newProfileId(): string {
 }
 
 function clampAge(age: number): number {
-  return Math.min(10, Math.max(3, Math.round(age)));
+  return Math.min(9, Math.max(3, Math.round(age)));
+}
+
+function learningDefaults(raw?: Partial<ChildProfile>): Pick<
+  ChildProfile,
+  'hintsEnabled' | 'englishLevel' | 'wordProgress' | 'sessionLimit' | 'levelStars'
+> {
+  const level = raw?.englishLevel;
+  return {
+    hintsEnabled: raw?.hintsEnabled ?? true,
+    englishLevel: level === 'some' || level === 'ready' ? level : 'new',
+    wordProgress: raw?.wordProgress && typeof raw.wordProgress === 'object' ? raw.wordProgress : {},
+    sessionLimit: typeof raw?.sessionLimit === 'number' ? Math.max(0, Math.min(20, Math.round(raw.sessionLimit))) : 8,
+    levelStars: raw?.levelStars && typeof raw.levelStars === 'object' ? raw.levelStars : {},
+  };
+}
+
+function readPin(value: unknown): string | null {
+  return typeof value === 'string' && /^\d{4}$/.test(value) ? value : null;
 }
 
 function sanitizeName(name: string): string {
   return name.trim().slice(0, PROFILE_NAME_MAX);
 }
 
-function makeProfile(
-  name: string,
-  age: number,
-  progress?: Partial<Pick<ChildProfile, 'coins' | 'ownedCosmeticIds' | 'equipped' | 'clearedLevelIds' | 'highestUnlocked'>>,
-): ChildProfile {
+function makeProfile(name: string, age: number, progress?: Partial<ChildProfile>): ChildProfile {
   return {
     id: newProfileId(),
     name: sanitizeName(name) || t('common.player'),
@@ -178,6 +227,7 @@ function makeProfile(
     equipped: { ...defaultEquipped, ...progress?.equipped },
     clearedLevelIds: progress?.clearedLevelIds ?? [],
     highestUnlocked: progress?.highestUnlocked ?? FREE_UNLOCK_COUNT,
+    ...learningDefaults(progress),
   };
 }
 
@@ -198,6 +248,8 @@ function migrateFromRaw(raw: string): DevicePersisted {
       voiceEnabled: parsed.voiceEnabled ?? true,
       language: normalizeLanguage(parsed.language),
       languageChosen: resolveLanguageChosen(parsed),
+      parentPin: readPin(parsed.parentPin),
+      parentUnlockedUntil: 0,
     };
   }
 
@@ -217,6 +269,8 @@ function migrateFromRaw(raw: string): DevicePersisted {
       voiceEnabled: parsed.voiceEnabled ?? true,
       language: normalizeLanguage(parsed.language),
       languageChosen: resolveLanguageChosen(parsed),
+      parentPin: readPin(parsed.parentPin),
+      parentUnlockedUntil: 0,
     };
   }
 
@@ -226,6 +280,7 @@ function migrateFromRaw(raw: string): DevicePersisted {
     voiceEnabled: parsed.voiceEnabled ?? true,
     language: normalizeLanguage(parsed.language),
     languageChosen: resolveLanguageChosen(parsed),
+    parentPin: readPin(parsed.parentPin),
   };
 }
 
@@ -247,6 +302,18 @@ const GameContext = createContext<GameContextValue | null>(null);
 export function GameProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<DevicePersisted>(defaultDevice);
   const [ready, setReady] = useState(false);
+  const [saveWarning, setSaveWarning] = useState(false);
+  const [sittingCount, setSittingCount] = useState(0);
+  const stateRef = useRef(state);
+  const allowSave = useRef(false);
+  const pinFails = useRef(0);
+  const pinLockedUntil = useRef(0);
+  stateRef.current = state;
+
+  const commit = useCallback((next: DevicePersisted) => {
+    stateRef.current = next;
+    setState(next);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -261,17 +328,28 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
           }
         }
         if (raw) {
-          const migrated = migrateFromRaw(raw);
+          let migrated: DevicePersisted;
+          try {
+            migrated = migrateFromRaw(raw);
+          } catch {
+            const backup = await AsyncStorage.getItem(BACKUP_KEY);
+            if (!backup) throw new Error('save unreadable');
+            migrated = migrateFromRaw(backup);
+          }
           setI18nLanguage(migrated.language);
+          allowSave.current = true;
           setState(migrated);
         } else {
           const fresh = bootstrapFreshInstall();
           setI18nLanguage(fresh.language);
+          allowSave.current = true;
           setState(fresh);
         }
       } catch {
         const fresh = bootstrapFreshInstall();
         setI18nLanguage(fresh.language);
+        allowSave.current = false;
+        setSaveWarning(true);
         setState(fresh);
       } finally {
         setReady(true);
@@ -280,8 +358,11 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   useEffect(() => {
-    if (!ready) return;
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(state)).catch(() => undefined);
+    if (!ready || !allowSave.current) return;
+    const payload = JSON.stringify(state);
+    AsyncStorage.setItem(STORAGE_KEY, payload)
+      .then(() => AsyncStorage.setItem(BACKUP_KEY, payload))
+      .catch(() => setSaveWarning(true));
   }, [state, ready]);
 
   useEffect(() => {
@@ -300,43 +381,33 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   const createProfile = useCallback((name: string, age: number): ChildProfile | null => {
     const clean = sanitizeName(name);
     if (!clean) return null;
+    const s = stateRef.current;
+    if (s.profiles.length >= MAX_PROFILES) return null;
     const profile = makeProfile(clean, age);
-    let accepted = false;
-    setState((s) => {
-      if (s.profiles.length >= MAX_PROFILES) return s;
-      accepted = true;
-      return {
-        ...s,
-        profiles: [...s.profiles, profile],
-        activeProfileId: profile.id,
-      };
+    commit({
+      ...s,
+      profiles: [...s.profiles, profile],
+      activeProfileId: profile.id,
     });
-    return accepted ? profile : null;
-  }, []);
+    return profile;
+  }, [commit]);
 
   const switchProfile = useCallback((id: string): boolean => {
-    let ok = false;
-    setState((s) => {
-      if (!s.profiles.some((p) => p.id === id)) return s;
-      ok = true;
-      return { ...s, activeProfileId: id };
-    });
-    return ok;
-  }, []);
+    const s = stateRef.current;
+    if (!s.profiles.some((p) => p.id === id)) return false;
+    commit({ ...s, activeProfileId: id });
+    return true;
+  }, [commit]);
 
   const deleteProfile = useCallback((id: string): boolean => {
-    let ok = false;
-    setState((s) => {
-      if (s.profiles.length <= 1) return s;
-      if (!s.profiles.some((p) => p.id === id)) return s;
-      const profiles = s.profiles.filter((p) => p.id !== id);
-      const activeProfileId =
-        s.activeProfileId === id ? profiles[0]!.id : s.activeProfileId;
-      ok = true;
-      return { ...s, profiles, activeProfileId };
-    });
-    return ok;
-  }, []);
+    const s = stateRef.current;
+    if (s.profiles.length <= 1) return false;
+    if (!s.profiles.some((p) => p.id === id)) return false;
+    const profiles = s.profiles.filter((p) => p.id !== id);
+    const activeProfileId = s.activeProfileId === id ? profiles[0]!.id : s.activeProfileId;
+    commit({ ...s, profiles, activeProfileId });
+    return true;
+  }, [commit]);
 
   const updateActiveAge = useCallback((age: number) => {
     setState((s) =>
@@ -355,15 +426,21 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const spendCoins = useCallback((n: number) => {
-    let ok = false;
-    setState((s) => {
-      const active = s.profiles.find((p) => p.id === s.activeProfileId);
-      if (!active || active.coins < n) return s;
-      ok = true;
-      return patchActive(s, (p) => ({ ...p, coins: p.coins - n }));
+    const s = stateRef.current;
+    const active = s.profiles.find((p) => p.id === s.activeProfileId);
+    if (!active || active.coins < n) return false;
+    commit(patchActive(s, (p) => ({ ...p, coins: p.coins - n })));
+    return true;
+  }, [commit]);
+
+  const addCoinsToProfile = useCallback((profileId: string, n: number) => {
+    const s = stateRef.current;
+    if (!s.profiles.some((p) => p.id === profileId) || n === 0) return;
+    commit({
+      ...s,
+      profiles: s.profiles.map((p) => (p.id === profileId ? { ...p, coins: p.coins + n } : p)),
     });
-    return ok;
-  }, []);
+  }, [commit]);
 
   const setPremium = useCallback((v: boolean) => {
     setState((s) => ({ ...s, premium: v }));
@@ -417,22 +494,90 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const clearLevel = useCallback((levelId: number, reward: number) => {
-    setState((s) =>
+  const clearLevel = useCallback((levelId: number, reward: number, stars?: 1 | 2 | 3): number => {
+    const s = stateRef.current;
+    const active = s.profiles.find((p) => p.id === s.activeProfileId);
+    if (!active) return 0;
+    const already = active.clearedLevelIds.includes(levelId);
+    const awarded = already ? Math.floor(reward / 4) : reward;
+    commit(
       patchActive(s, (p) => {
-        const already = p.clearedLevelIds.includes(levelId);
         const cleared = already ? p.clearedLevelIds : [...p.clearedLevelIds, levelId];
         const nextUnlock = Math.max(p.highestUnlocked, Math.min(TOTAL_LEVELS, levelId + 1));
-        const highestUnlocked = Math.max(FREE_UNLOCK_COUNT, nextUnlock, p.highestUnlocked);
+        const levelStars = { ...p.levelStars };
+        if (stars) levelStars[String(levelId)] = stars;
         return {
           ...p,
           clearedLevelIds: cleared,
-          highestUnlocked,
-          coins: p.coins + (already ? Math.floor(reward / 4) : reward),
+          highestUnlocked: Math.max(FREE_UNLOCK_COUNT, nextUnlock, p.highestUnlocked),
+          coins: p.coins + awarded,
+          levelStars,
         };
       }),
     );
+    setSittingCount((c) => c + 1);
+    return awarded;
+  }, [commit]);
+
+  const recordLearning = useCallback((attempts: WordAttempt[]) => {
+    if (!attempts.length) return;
+    const now = Date.now();
+    commit(
+      patchActive(stateRef.current, (p) => {
+        const wordProgress = { ...p.wordProgress };
+        for (const attempt of attempts) {
+          if (!attempt.id) continue;
+          wordProgress[attempt.id] = applyAttempt(wordProgress[attempt.id], attempt, now);
+        }
+        return { ...p, wordProgress };
+      }),
+    );
+  }, [commit]);
+
+  const setHintsEnabled = useCallback((v: boolean) => {
+    commit(patchActive(stateRef.current, (p) => ({ ...p, hintsEnabled: v })));
+  }, [commit]);
+
+  const setEnglishLevel = useCallback((level: EnglishLevel) => {
+    commit(patchActive(stateRef.current, (p) => ({ ...p, englishLevel: level })));
+  }, [commit]);
+
+  const setSessionLimit = useCallback((n: number) => {
+    const sessionLimit = Math.max(0, Math.min(20, Math.round(n)));
+    commit(patchActive(stateRef.current, (p) => ({ ...p, sessionLimit })));
+  }, [commit]);
+
+  const dismissSitting = useCallback(() => {
+    setSittingCount(0);
   }, []);
+
+  const setParentPin = useCallback((pin: string) => {
+    if (!/^\d{4}$/.test(pin)) return false;
+    const next = { ...stateRef.current, parentPin: pin, parentUnlockedUntil: Date.now() + PARENT_SESSION_MS };
+    commit(next);
+    pinFails.current = 0;
+    return true;
+  }, [commit]);
+
+  const unlockParent = useCallback(() => {
+    commit({ ...stateRef.current, parentUnlockedUntil: Date.now() + PARENT_SESSION_MS });
+  }, [commit]);
+
+  const verifyParentPin = useCallback((pin: string): 'ok' | 'wrong' | 'locked' => {
+    if (Date.now() < pinLockedUntil.current) return 'locked';
+    if (stateRef.current.parentPin && stateRef.current.parentPin === pin) {
+      pinFails.current = 0;
+      unlockParent();
+      return 'ok';
+    }
+    pinFails.current += 1;
+    if (pinFails.current >= 5) {
+      pinFails.current = 0;
+      pinLockedUntil.current = Date.now() + 30_000;
+      return 'locked';
+    }
+    return 'wrong';
+  }, [unlockParent]);
 
   const isLevelUnlocked = useCallback(
     (levelId: number) => {
@@ -443,9 +588,15 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
   );
 
   const resetProgress = useCallback(() => {
-    // Full wipe → re-run first-launch language bootstrap (TR gate / silent EN).
-    setState(bootstrapFreshInstall());
-  }, []);
+    const kept = stateRef.current;
+    const fresh = bootstrapFreshInstall();
+    commit({
+      ...fresh,
+      premium: kept.premium,
+      parentPin: kept.parentPin,
+    });
+    setSittingCount(0);
+  }, [commit]);
 
   const ageBand = useMemo(
     () => (activeProfile != null ? ageToBand(activeProfile.age) : null),
@@ -470,12 +621,21 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       language: state.language,
       languageChosen: state.languageChosen,
       ageBand,
+      hintsEnabled: activeProfile?.hintsEnabled ?? true,
+      englishLevel: activeProfile?.englishLevel ?? 'new',
+      wordProgress: activeProfile?.wordProgress ?? {},
+      sessionLimit: activeProfile?.sessionLimit ?? 8,
+      sittingCount,
+      saveWarning,
+      parentPinSet: state.parentPin != null,
+      parentUnlockedUntil: state.parentUnlockedUntil,
       createProfile,
       switchProfile,
       deleteProfile,
       updateActiveAge,
       updateActiveName,
       addCoins,
+      addCoinsToProfile,
       spendCoins,
       setPremium,
       setVoiceEnabled,
@@ -484,8 +644,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       ownCosmetic,
       equipCosmetic,
       clearLevel,
+      recordLearning,
       isLevelUnlocked,
       resetProgress,
+      dismissSitting,
+      setHintsEnabled,
+      setEnglishLevel,
+      setSessionLimit,
+      setParentPin,
+      verifyParentPin,
+      unlockParent,
     }),
     [
       state.profiles,
@@ -494,15 +662,20 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       state.voiceEnabled,
       state.language,
       state.languageChosen,
+      state.parentPin,
+      state.parentUnlockedUntil,
       ready,
       activeProfile,
       ageBand,
+      sittingCount,
+      saveWarning,
       createProfile,
       switchProfile,
       deleteProfile,
       updateActiveAge,
       updateActiveName,
       addCoins,
+      addCoinsToProfile,
       spendCoins,
       setPremium,
       setVoiceEnabled,
@@ -511,8 +684,16 @@ export function GameProvider({ children }: { children: React.ReactNode }) {
       ownCosmetic,
       equipCosmetic,
       clearLevel,
+      recordLearning,
       isLevelUnlocked,
       resetProgress,
+      dismissSitting,
+      setHintsEnabled,
+      setEnglishLevel,
+      setSessionLimit,
+      setParentPin,
+      verifyParentPin,
+      unlockParent,
     ],
   );
 

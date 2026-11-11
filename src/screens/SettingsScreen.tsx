@@ -18,7 +18,7 @@ import { colors } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
-const AGES = [3, 4, 5, 6, 7, 8, 9, 10];
+const AGES = [3, 4, 5, 6, 7, 8, 9];
 
 type GateKind =
   | { type: 'age' }
@@ -46,6 +46,13 @@ export function SettingsScreen({ navigation }: Props) {
     setLanguage,
     resetProgress,
     ownCosmetic,
+    hintsEnabled,
+    setHintsEnabled,
+    englishLevel,
+    setEnglishLevel,
+    sessionLimit,
+    setSessionLimit,
+    saveWarning,
   } = useGame();
   const [ageDraft, setAgeDraft] = useState(childAge ?? 5);
   const [gate, setGate] = useState<GateKind>(null);
@@ -98,7 +105,7 @@ export function SettingsScreen({ navigation }: Props) {
 
     setBusy(true);
     try {
-      const res = await restorePurchases();
+      const res = await restorePurchases(premium);
       if (res.premium) {
         setPremium(true);
         const { COSMETICS } = await import('../data/cosmetics');
@@ -240,6 +247,41 @@ export function SettingsScreen({ navigation }: Props) {
               tone="sky"
               onPress={() => setGate({ type: 'add' })}
               disabled={profiles.length >= MAX_PROFILES}
+              style={{ marginTop: 12 }}
+            />
+          </FadeInView>
+
+          {saveWarning ? <StatusBanner message={t('settings.saveWarning')} tone="warn" /> : null}
+
+          <FadeInView delay={60} style={styles.card}>
+            <Text style={styles.h}>{t('settings.learning')}</Text>
+            <Text style={styles.sub}>{t('settings.hints')}</Text>
+            <BouncePress
+              onPress={() => setHintsEnabled(!hintsEnabled)}
+              style={[styles.toggleRow, hintsEnabled ? styles.toggleOn : styles.toggleOff]}
+            >
+              <Text style={[styles.toggleLabel, hintsEnabled && styles.toggleLabelOn]}>
+                {hintsEnabled ? t('common.on') : t('common.off')}
+              </Text>
+            </BouncePress>
+            <View style={styles.langRow}>
+              {(['new', 'some', 'ready'] as const).map((level) => (
+                <BouncePress
+                  key={level}
+                  onPress={() => setEnglishLevel(level)}
+                  style={[styles.langBtn, englishLevel === level && styles.langBtnOn]}
+                >
+                  <Text style={[styles.langText, englishLevel === level && styles.langTextOn]}>
+                    {t(level === 'new' ? 'settings.levelNew' : level === 'some' ? 'settings.levelSome' : 'settings.levelReady')}
+                  </Text>
+                </BouncePress>
+              ))}
+            </View>
+            <PrimaryButton
+              label={sessionLimit === 0 ? t('settings.sessionOff') : t('settings.session', { n: sessionLimit })}
+              large={false}
+              tone="sky"
+              onPress={() => setSessionLimit(sessionLimit >= 12 ? 0 : sessionLimit + 4)}
               style={{ marginTop: 12 }}
             />
           </FadeInView>

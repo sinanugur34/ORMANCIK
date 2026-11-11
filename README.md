@@ -1,12 +1,12 @@
 # Ormancık
 
-3–10 yaş için renkli, reklama dayalı + jetonlu kozmetik + tek seferlik Premium çocuk oyunu (Expo / React Native).
+3–9 yaş için renkli, reklama dayalı + jetonlu kozmetik + tek seferlik Premium çocuk oyunu (Expo / React Native).
 
 Play Store ve App Store’a gidecek şekilde tasarlandı: ebeveyn kapısı, yaşa göre içerik, 80 prosedürel bölüm, yaratıcı oyun odası.
 
 ## Özellikler
 
-- **Yaş bantları:** Ebeveyn yaş girer (3–10) → `3–5` / `6–8` / `9–10` zorluk ve şablonlar
+- **Yaş bantları:** Ebeveyn yaş girer (3–9) → `3–5` / `6–8` / `9` zorluk ve şablonlar
 - **80 bölüm:** 8 ada × 10 bölüm (renk eşleştir, şekil, sıra, hafıza, sayma)
 - **Bölüm kilidi parayla değil:** İlk 30 açık; sonrası sırayla açılır
 - **Jeton:** Bölüm ödülü + ödüllü reklam (mock) + IAP jeton paketleri (mock)

@@ -1,9 +1,11 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ImageBackground, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { speakKidPrompt } from '../audio/speakPrompt';
 import { GroveMascot } from '../components/GroveMascot';
+import { ListenBar } from '../components/ListenBar';
 import { BouncePress, FadeInView } from '../components/Motion';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { COSMETICS } from '../data/cosmetics';
@@ -29,6 +31,12 @@ export function PlayRoomScreen({ navigation }: Props) {
   const pet = COSMETICS.find((c) => c.id === equipped.pet);
   const fx = equipped.fx ? COSMETICS.find((c) => c.id === equipped.fx) : null;
   const roomArt = ROOM_ART[equipped.room] ?? ROOM_ART['room-meadow'];
+  const treehouse = equipped.room === 'room-treehouse';
+  const [hatOn, setHatOn] = useState(equipped.outfit === 'outfit-leaf');
+
+  useEffect(() => {
+    void speakKidPrompt('Put on the hat.', { lang: 'en', clipId: 'room-hat' });
+  }, []);
 
   const ownedOutfits = useMemo(
     () =>
@@ -42,7 +50,11 @@ export function PlayRoomScreen({ navigation }: Props) {
     <View style={styles.root}>
       <ImageBackground source={roomArt} style={styles.bg} resizeMode="cover">
         <LinearGradient
-          colors={['rgba(15,61,46,0.25)', 'rgba(15,61,46,0.55)']}
+          colors={
+            treehouse
+              ? ['rgba(92,58,26,0.45)', 'rgba(47,27,12,0.72)']
+              : ['rgba(15,61,46,0.25)', 'rgba(15,61,46,0.55)']
+          }
           style={StyleSheet.absoluteFill}
         />
         <SafeAreaView style={styles.safe}>
@@ -63,7 +75,8 @@ export function PlayRoomScreen({ navigation }: Props) {
               petEmoji={pet?.emoji}
               fxEmoji={fx?.emoji}
             />
-            <Text style={styles.caption}>{t('playRoom.caption')}</Text>
+            <Text style={styles.caption}>{hatOn ? t('playRoom.taskDone') : t('playRoom.task')}</Text>
+            <ListenBar text="Put on the hat." clipId="room-hat" lang="en" />
           </FadeInView>
 
           <View style={styles.tray}>
@@ -75,7 +88,10 @@ export function PlayRoomScreen({ navigation }: Props) {
                 {ownedOutfits.map((c) => (
                   <BouncePress
                     key={c.id}
-                    onPress={() => equipCosmetic(c.id)}
+                    onPress={() => {
+                      equipCosmetic(c.id);
+                      if (c.id === 'outfit-leaf') setHatOn(true);
+                    }}
                     style={[styles.chip, equipped.outfit === c.id && styles.chipOn]}
                   >
                     <Text style={styles.chipEmoji}>{c.emoji}</Text>

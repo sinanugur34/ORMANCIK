@@ -25,7 +25,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ProfileSetup'>;
 const BAND_IDS = [
   { id: '3-5' as const, ages: [3, 4, 5] },
   { id: '6-8' as const, ages: [6, 7, 8] },
-  { id: '9-10' as const, ages: [9, 10] },
+  { id: '9-10' as const, ages: [9] },
 ];
 
 export function ProfileSetupScreen({ navigation, route }: Props) {

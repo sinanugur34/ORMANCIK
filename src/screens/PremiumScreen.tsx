@@ -17,11 +17,12 @@ import { colors } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Premium'>;
 
-type GateKind = 'buy' | 'restore' | null;
+type GateKind = 'buy' | 'restore' | 'view' | null;
 
 export function PremiumScreen({ navigation }: Props) {
   const t = useT();
-  const { premium, setPremium, addCoins, ownCosmetic } = useGame();
+  const { premium, setPremium, addCoinsToProfile, ownCosmetic, activeProfileId, parentUnlockedUntil } = useGame();
+  const grown = parentUnlockedUntil > Date.now();
   const [gate, setGate] = useState<GateKind>(null);
   const [busy, setBusy] = useState(false);
   const [banner, setBanner] = useState<{ message: string; tone: 'ok' | 'error' | 'info' | 'warn' } | null>(
@@ -45,13 +46,14 @@ export function PremiumScreen({ navigation }: Props) {
   };
 
   const buy = async () => {
+    const buyer = activeProfileId;
     setBusy(true);
     setBanner(null);
     try {
       const res = await purchasePremium();
       if (res.ok) {
         setPremium(true);
-        if (res.coins) addCoins(res.coins);
+        if (res.coins && buyer) addCoinsToProfile(buyer, res.coins);
         await unlockAllCosmetics();
         setBanner({
           message: res.mock
@@ -73,7 +75,7 @@ export function PremiumScreen({ navigation }: Props) {
     setBusy(true);
     setBanner(null);
     try {
-      const res = await restorePurchases();
+      const res = await restorePurchases(premium);
       if (res.premium) {
         setPremium(true);
         await unlockAllCosmetics();
@@ -115,20 +117,26 @@ export function PremiumScreen({ navigation }: Props) {
               <StatusBanner message={banner.message} tone={banner.tone} style={{ marginBottom: 14 }} />
             ) : null}
 
+            {grown ? (
             <FadeInView>
               <Text style={styles.eyebrow}>{t('brand.name')}</Text>
               <Text style={styles.title}>{t('premium.title')}</Text>
               <Text style={styles.sub}>{t('premium.sub')}</Text>
             </FadeInView>
+            ) : null}
 
             <FadeInView delay={100} style={styles.card}>
+              {!grown ? (
+                <PrimaryButton label={t('shop.grownups')} tone="sun" onPress={() => setGate('view')} />
+              ) : (
+                <>
               {perks.map((p) => (
                 <View key={p} style={styles.perk}>
                   <Text style={styles.check}>✓</Text>
                   <Text style={styles.perkText}>{p}</Text>
                 </View>
               ))}
-              <Text style={styles.price}>{PRODUCTS.premium.priceLabel}</Text>
+              <Text style={styles.price}>{t('money.demoNoPrice')}</Text>
               {premium ? (
                 <View style={styles.owned}>
                   <Text style={styles.ownedText}>{t('premium.owned')}</Text>
@@ -149,6 +157,8 @@ export function PremiumScreen({ navigation }: Props) {
                 onPress={() => setGate('restore')}
                 style={{ marginTop: 10 }}
               />
+                </>
+              )}
             </FadeInView>
           </ScrollView>
         </SafeAreaView>

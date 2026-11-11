@@ -15,6 +15,7 @@ import { PrivacyScreen } from './src/screens/PrivacyScreen';
 import { ProfileSetupScreen } from './src/screens/ProfileSetupScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { ShopScreen } from './src/screens/ShopScreen';
+import { WordAlbumScreen } from './src/screens/WordAlbumScreen';
 import { useLanguage, useT } from './src/i18n';
 import { GameProvider, useGame } from './src/store/GameContext';
 import { colors } from './src/theme/colors';
@@ -96,6 +97,7 @@ function RootNav() {
       <Stack.Screen name="Premium" component={PremiumScreen} options={{ animation: 'fade' }} />
       <Stack.Screen name="Settings" component={SettingsScreen} options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="Privacy" component={PrivacyScreen} options={{ animation: 'fade' }} />
+      <Stack.Screen name="WordAlbum" component={WordAlbumScreen} options={{ animation: 'slide_from_right' }} />
     </Stack.Navigator>
   );
 }

@@ -1,7 +1,7 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useMemo, useState } from 'react';
-import { Modal, StyleSheet, Text, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   FadeIn,
   ZoomIn,
@@ -46,13 +46,14 @@ function StarRow({ stars }: { stars: 1 | 2 | 3 }) {
 export function LevelScreen({ navigation, route }: Props) {
   const t = useT();
   const { levelId } = route.params;
-  const { ageBand, clearLevel, isLevelUnlocked, language } = useGame();
+  const { ageBand, clearLevel, hintsEnabled, isLevelUnlocked, language, recordLearning } = useGame();
   const band = ageBand ?? '3-5';
   const level = useMemo(() => buildLevel(levelId, band, language), [levelId, band, language]);
   const island = islandForLevel(levelId);
   const islandLabel = displayIslandName(island);
   const [won, setWon] = useState(false);
   const [stars, setStars] = useState<1 | 2 | 3>(3);
+  const [awarded, setAwarded] = useState(level.reward);
   const pulse = useSharedValue(1);
 
   React.useEffect(() => {
@@ -93,17 +94,24 @@ export function LevelScreen({ navigation, route }: Props) {
           </View>
         </View>
 
-        <FadeInView style={styles.card}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.card}
+          keyboardShouldPersistTaps="handled"
+        >
           <LevelPlay
             level={level}
             band={band}
-            onWin={(earned) => {
-              clearLevel(levelId, level.reward);
-              setStars(earned);
+            hintsEnabled={hintsEnabled}
+            onWin={(result) => {
+              const coins = clearLevel(levelId, level.reward, result.stars);
+              recordLearning(result.words);
+              setAwarded(coins);
+              setStars(result.stars);
               setWon(true);
             }}
           />
-        </FadeInView>
+        </ScrollView>
       </SafeAreaView>
 
       <Modal visible={won} transparent animationType="fade">
@@ -115,7 +123,7 @@ export function LevelScreen({ navigation, route }: Props) {
                 {t('level.bravo')}
               </Animated.Text>
               <Text style={styles.modalSub}>
-                {t('level.rewardSub', { island: islandLabel, reward: level.reward })}
+                {t('level.rewardSub', { island: islandLabel, reward: awarded })}
               </Text>
               <StarRow stars={stars} />
             </LinearGradient>
@@ -171,12 +179,13 @@ const styles = StyleSheet.create({
   backText: { fontSize: 16, fontWeight: '800', color: colors.forestDeep },
   island: { fontWeight: '700', color: colors.muted },
   title: { fontSize: 20, fontWeight: '900', color: colors.forestDeep },
+  scroll: { flex: 1 },
   card: {
     margin: 16,
     backgroundColor: colors.card,
     borderRadius: 28,
     padding: 16,
-    flexGrow: 1,
+    paddingBottom: 28,
   },
   modalBg: {
     flex: 1,

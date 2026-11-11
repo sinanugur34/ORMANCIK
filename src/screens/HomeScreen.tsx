@@ -1,6 +1,6 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useRef } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { speakKidPrompt } from '../audio/speakPrompt';
 import { AnimatedBackground } from '../components/AnimatedBackground';
@@ -29,6 +29,10 @@ export function HomeScreen({ navigation }: Props) {
     highestUnlocked,
     voiceEnabled,
     language,
+    sessionLimit,
+    sittingCount,
+    dismissSitting,
+    saveWarning,
   } = useGame();
   const soft = ageBand === '3-5';
   const greetedId = useRef<string | null>(null);
@@ -44,7 +48,7 @@ export function HomeScreen({ navigation }: Props) {
     if (!activeProfileId || !childName || !voiceEnabled) return;
     if (greetedId.current === activeProfileId) return;
     greetedId.current = activeProfileId;
-    void speakKidPrompt(t('home.greetSpeech', { name: childName }));
+    void speakKidPrompt("Hello. Let's play.", { lang: 'en', clipId: 'greet' });
   }, [activeProfileId, childName, voiceEnabled, language, t]);
 
   const explorer = childName ?? t('common.explorer');
@@ -94,59 +98,59 @@ export function HomeScreen({ navigation }: Props) {
             </View>
           </FadeInView>
 
+          {saveWarning ? (
+            <Text style={styles.breakBody}>{t('settings.saveWarning')}</Text>
+          ) : null}
+          {sessionLimit > 0 && sittingCount >= sessionLimit ? (
+            <FadeInView style={styles.breakCard}>
+              <Text style={styles.breakTitle}>{t('home.breakTitle')}</Text>
+              <Text style={styles.breakBody}>{t('home.breakBody')}</Text>
+              <PrimaryButton
+                label={t('home.breakContinue')}
+                tone="sky"
+                onPress={() => {
+                  dismissSitting();
+                  navigation.navigate('Level', { levelId: nextLevel });
+                }}
+                style={{ marginTop: 12 }}
+              />
+            </FadeInView>
+          ) : null}
+
           <FadeInView delay={100} style={styles.actions}>
             <Pulse>
               <PrimaryButton
-                label={soft ? t('home.play') : t('home.goMap')}
-                onPress={() =>
-                  soft
-                    ? navigation.navigate('Level', { levelId: nextLevel })
-                    : navigation.navigate('Map')
-                }
+                label={t('home.continueAdventure')}
+                onPress={() => navigation.navigate('Level', { levelId: nextLevel })}
               />
             </Pulse>
             <PrimaryButton
-              label={soft ? t('home.map') : t('home.playRoom')}
+              label={t('home.exploreMap')}
               tone="sky"
-              onPress={() =>
-                soft ? navigation.navigate('Map') : navigation.navigate('PlayRoom')
-              }
+              onPress={() => navigation.navigate('Map')}
               style={{ marginTop: 14 }}
             />
-            {soft ? (
-              <PrimaryButton
-                label={t('home.playRoom')}
-                tone="sun"
-                large={false}
-                onPress={() => navigation.navigate('PlayRoom')}
-                style={{ marginTop: 12 }}
-              />
-            ) : null}
+            <PrimaryButton
+              label={t('home.wordAlbum')}
+              tone="sun"
+              large={false}
+              onPress={() => navigation.navigate('WordAlbum')}
+              style={{ marginTop: 12 }}
+            />
+            <PrimaryButton
+              label={t('home.playRoom')}
+              tone="sky"
+              large={false}
+              onPress={() => navigation.navigate('PlayRoom')}
+              style={{ marginTop: 12 }}
+            />
           </FadeInView>
 
-          {!soft ? (
-            <FadeInView delay={180}>
-              <Text style={styles.section}>{t('home.explore')}</Text>
-              <View style={styles.row}>
-                <BouncePress style={styles.tile} onPress={() => navigation.navigate('Shop')}>
-                  <Image source={require('../../assets/art/mascot.jpg')} style={styles.tileImg} />
-                  <Text style={styles.tileTitle}>{t('home.shop')}</Text>
-                  <Text style={styles.tileSub}>{t('home.shopSub')}</Text>
-                </BouncePress>
-                <BouncePress style={styles.tile} onPress={() => navigation.navigate('Premium')}>
-                  <Image source={require('../../assets/art/world-map.jpg')} style={styles.tileImg} />
-                  <Text style={styles.tileTitle}>{t('home.premiumTile')}</Text>
-                  <Text style={styles.tileSub}>{t('home.premiumSub')}</Text>
-                </BouncePress>
-              </View>
-            </FadeInView>
-          ) : (
-            <FadeInView delay={180} style={styles.softExplore}>
-              <BouncePress style={styles.softTile} onPress={() => navigation.navigate('Shop')}>
-                <Text style={styles.softTileText}>{t('home.shop')}</Text>
-              </BouncePress>
-            </FadeInView>
-          )}
+          <FadeInView delay={180} style={styles.softExplore}>
+            <BouncePress style={styles.softTile} onPress={() => navigation.navigate('Shop')}>
+              <Text style={styles.softTileText}>{t('home.shop')}</Text>
+            </BouncePress>
+          </FadeInView>
 
           <BouncePress style={styles.privacyLink} onPress={() => navigation.navigate('Privacy')}>
             <Text style={styles.privacyText}>{t('home.privacy')}</Text>
@@ -241,4 +245,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   softTileText: { fontSize: 18, fontWeight: '800', color: colors.forestDeep },
+  breakCard: {
+    marginHorizontal: 20,
+    marginTop: 8,
+    backgroundColor: colors.card,
+    borderRadius: 20,
+    padding: 16,
+  },
+  breakTitle: { fontSize: 18, fontWeight: '900', color: colors.forestDeep },
+  breakBody: { marginTop: 4, color: colors.muted, fontWeight: '600', marginHorizontal: 20 },
 });

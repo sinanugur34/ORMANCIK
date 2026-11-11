@@ -23,6 +23,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Shop'>;
 type GateAction =
   | { type: 'ad' }
   | { type: 'pack'; key: CoinPackKey }
+  | { type: 'reveal' }
   | null;
 
 export function ShopScreen({ navigation }: Props) {
@@ -32,10 +33,13 @@ export function ShopScreen({ navigation }: Props) {
     premium,
     ownedCosmeticIds,
     spendCoins,
-    addCoins,
+    addCoinsToProfile,
     ownCosmetic,
     equipCosmetic,
+    activeProfileId,
+    parentUnlockedUntil,
   } = useGame();
+  const commercial = parentUnlockedUntil > Date.now();
   const [gate, setGate] = useState<GateAction>(null);
   const [busy, setBusy] = useState(false);
   const [banner, setBanner] = useState<{ message: string; tone: 'ok' | 'error' | 'info' | 'warn' } | null>(
@@ -62,14 +66,15 @@ export function ShopScreen({ navigation }: Props) {
 
   const runGateSuccess = async () => {
     const action = gate;
+    const buyer = activeProfileId;
     setGate(null);
-    if (!action) return;
+    if (!action || action.type === 'reveal') return;
     setBusy(true);
     setBanner(null);
     try {
       if (action.type === 'ad') {
         if (premium) {
-          addCoins(REWARDED_COIN_AMOUNT);
+          if (buyer) addCoinsToProfile(buyer, REWARDED_COIN_AMOUNT);
           setBanner({
             message: t('shop.rewardPremium', { n: REWARDED_COIN_AMOUNT }),
             tone: 'ok',
@@ -77,7 +82,7 @@ export function ShopScreen({ navigation }: Props) {
         } else {
           const res = await showRewardedAd();
           if (res.rewarded) {
-            addCoins(REWARDED_COIN_AMOUNT);
+            if (buyer) addCoinsToProfile(buyer, REWARDED_COIN_AMOUNT);
             setBanner({
               message: res.mock
                 ? t('shop.rewardMock', {
@@ -94,7 +99,7 @@ export function ShopScreen({ navigation }: Props) {
       } else {
         const res = await purchaseCoinPack(action.key);
         if (res.ok && res.coins) {
-          addCoins(res.coins);
+            if (buyer) addCoinsToProfile(buyer, res.coins);
           setBanner({
             message: res.mock
               ? t('shop.rewardMock', { n: res.coins, note: MONETIZATION_COPY.mockIapNote })
@@ -133,6 +138,8 @@ export function ShopScreen({ navigation }: Props) {
             <StatusBanner message={banner.message} tone={banner.tone} style={{ marginBottom: 10 }} />
           ) : null}
 
+          {commercial ? (
+          <>
           <FadeInView>
             <View style={styles.earnCard}>
               <Text style={styles.earnTitle}>{t('shop.earnTitle')}</Text>
@@ -165,12 +172,21 @@ export function ShopScreen({ navigation }: Props) {
                     >
                       <Text style={styles.packCoins}>{pack.coins} 🪙</Text>
                       <Text style={styles.packLabel}>{productLabel(key)}</Text>
-                      <Text style={styles.packPrice}>{pack.priceLabel}</Text>
+                      <Text style={styles.packPrice}>{t('shop.demoPrice')}</Text>
                     </BouncePress>
                   );
                 })}
             </View>
           </FadeInView>
+          </>
+          ) : (
+            <PrimaryButton
+              label={t('shop.grownups')}
+              tone="coral"
+              onPress={() => setGate({ type: 'reveal' })}
+              style={{ marginBottom: 16 }}
+            />
+          )}
 
           {kinds.map((kind, ki) => {
             const items = COSMETICS.filter((c) => c.kind === kind);
@@ -207,12 +223,14 @@ export function ShopScreen({ navigation }: Props) {
             );
           })}
 
-          <PrimaryButton
-            label={t('shop.seePremium')}
-            tone="coral"
-            onPress={() => navigation.navigate('Premium')}
-            style={{ marginTop: 8, marginBottom: 24 }}
-          />
+          {commercial ? (
+            <PrimaryButton
+              label={t('shop.seePremium')}
+              tone="coral"
+              onPress={() => navigation.navigate('Premium')}
+              style={{ marginTop: 8, marginBottom: 24 }}
+            />
+          ) : null}
         </ScrollView>
       </SafeAreaView>
 

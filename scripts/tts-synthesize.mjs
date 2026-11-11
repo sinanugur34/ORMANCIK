@@ -12,6 +12,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export const EDGE_VOICE_TR = 'tr-TR-EmelNeural';
 export const EDGE_VOICE_EN = 'en-US-JennyNeural';
@@ -121,7 +122,7 @@ export async function synthesizeToFile(text, opts = {}) {
 
 const isMain =
   process.argv[1] &&
-  path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname);
+  path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
 
 if (isMain) {
   const text = process.argv[2];
