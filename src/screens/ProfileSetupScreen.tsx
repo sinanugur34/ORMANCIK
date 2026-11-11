@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
   ageText: { fontSize: 22, fontWeight: '800', color: colors.forestDeep },
   ageTextOn: { color: colors.white },
   warn: {
-    color: colors.coral,
+    color: colors.coralInk,
     fontWeight: '700',
     marginBottom: 8,
     textAlign: 'center',

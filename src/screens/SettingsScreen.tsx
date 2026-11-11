@@ -696,7 +696,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  deleteText: { fontWeight: '800', color: colors.coral, fontSize: 13 },
+  deleteText: { fontWeight: '800', color: colors.coralInk, fontSize: 13 },
   toggleRow: {
     marginTop: 14,
     minHeight: 52,
@@ -756,6 +756,6 @@ const styles = StyleSheet.create({
   confirmGhost: { backgroundColor: 'rgba(15,61,46,0.08)' },
   confirmGhostText: { fontWeight: '700', color: colors.forestDeep },
   confirmPrimary: { backgroundColor: colors.forest },
-  confirmDanger: { backgroundColor: colors.coral },
+  confirmDanger: { backgroundColor: colors.coralStrong },
   confirmPrimaryText: { fontWeight: '800', color: colors.white },
 });

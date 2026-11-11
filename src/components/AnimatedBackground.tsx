@@ -78,6 +78,8 @@ function Sparkle({ left, top, delay }: { left: number; top: number; delay: numbe
 type Props = {
   children?: React.ReactNode;
   variant?: 'forest' | 'sunset' | 'ocean';
+  /** Lesson screens keep the color and drop the moving shapes. */
+  calm?: boolean;
 };
 
 const GRADIENTS = {
@@ -86,17 +88,23 @@ const GRADIENTS = {
   ocean: ['#C9F0FF', '#E8FFF8', colors.cream] as const,
 };
 
-export function AnimatedBackground({ children, variant = 'forest' }: Props) {
+export function AnimatedBackground({ children, variant = 'forest', calm = false }: Props) {
   return (
     <View style={styles.root}>
       <LinearGradient colors={[...GRADIENTS[variant]]} style={StyleSheet.absoluteFill} />
-      {BLOBS.map((b, i) => (
-        <FloatingBlob key={i} {...b} />
-      ))}
-      <Sparkle left={40} top={90} delay={0} />
-      <Sparkle left={280} top={160} delay={500} />
-      <Sparkle left={120} top={300} delay={900} />
-      <Sparkle left={250} top={480} delay={300} />
+      {calm
+        ? null
+        : BLOBS.map((b, i) => (
+            <FloatingBlob key={i} {...b} />
+          ))}
+      {calm ? null : (
+        <>
+          <Sparkle left={40} top={90} delay={0} />
+          <Sparkle left={280} top={160} delay={500} />
+          <Sparkle left={120} top={300} delay={900} />
+          <Sparkle left={250} top={480} delay={300} />
+        </>
+      )}
       {children}
     </View>
   );

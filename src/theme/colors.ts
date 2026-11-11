@@ -8,6 +8,10 @@ export const colors = {
   cream: '#FFF6E8',
   sun: '#FFC857',
   coral: '#FF6B6B',
+  /** White label on a coral action. Brighter coral stays a decoration, not a text color. */
+  coralStrong: '#B4232C',
+  /** Small coral text on cream or white. */
+  coralInk: '#8E1B24',
   sky: '#4ECDC4',
   berry: '#C44569',
   grape: '#6C5CE7',

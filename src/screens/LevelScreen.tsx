@@ -142,7 +142,7 @@ export function LevelScreen({ navigation, route }: Props) {
   }
 
   return (
-    <AnimatedBackground variant="sunset">
+    <AnimatedBackground variant="sunset" calm>
       <SafeAreaView style={{ flex: 1 }}>
         <View style={styles.header}>
           <BouncePress onPress={() => navigation.goBack()} style={styles.back}>
@@ -158,9 +158,10 @@ export function LevelScreen({ navigation, route }: Props) {
 
         <ScrollView
           style={styles.scroll}
-          contentContainerStyle={styles.card}
+          contentContainerStyle={styles.cardWrap}
           keyboardShouldPersistTaps="handled"
         >
+          <View style={styles.card}>
           <LevelPlay
             level={level}
             band={band}
@@ -174,13 +175,14 @@ export function LevelScreen({ navigation, route }: Props) {
               setWon(true);
             }}
           />
+          </View>
         </ScrollView>
       </SafeAreaView>
 
       <Modal visible={won} transparent animationType="fade">
         <View style={styles.modalBg}>
           <Animated.View entering={ZoomIn.springify()} style={styles.modalCard}>
-            <LinearGradient colors={[island.accent, colors.forest]} style={styles.modalHero}>
+            <LinearGradient colors={[colors.forest, colors.forestDeep]} style={styles.modalHero}>
               <SparkleBurst active={won} tone="good" count={16} />
               <Animated.Text entering={FadeIn.delay(80)} style={styles.modalTitle}>
                 {t('level.bravo')}
@@ -258,8 +260,10 @@ const styles = StyleSheet.create({
   island: { fontWeight: '700', color: colors.muted },
   title: { fontSize: 20, fontWeight: '900', color: colors.forestDeep },
   scroll: { flex: 1 },
+  cardWrap: { padding: 16, alignItems: 'center' },
   card: {
-    margin: 16,
+    width: '100%',
+    maxWidth: 680,
     backgroundColor: colors.card,
     borderRadius: 28,
     padding: 16,

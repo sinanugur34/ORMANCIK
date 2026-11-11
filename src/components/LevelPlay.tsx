@@ -693,7 +693,7 @@ function ArcadeLevel({ level, band, hintsEnabled, wordProgress = EMPTY_PROGRESS,
 
       {level.timerSec ? (
         <View style={styles.timerPill}>
-          <Text style={[styles.timer, seconds < 8 && { color: colors.coral }]}>{t('common.seconds', { n: seconds })}</Text>
+          <Text style={[styles.timer, seconds < 8 && { color: colors.coralInk }]}>{t('common.seconds', { n: seconds })}</Text>
         </View>
       ) : null}
 
@@ -1233,7 +1233,7 @@ const styles = StyleSheet.create({
   progDotOn: { backgroundColor: colors.forest },
   fb: { textAlign: 'center', marginTop: 10, fontWeight: '900', height: 32, fontSize: 18 },
   fbGood: { color: colors.forest },
-  fbBad: { color: colors.coral },
+  fbBad: { color: colors.coralInk },
   grid: { marginTop: 14 },
   targetHint: {
     textAlign: 'center',

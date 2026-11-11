@@ -1,6 +1,7 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Stage } from '../components/Stage';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { speakKidPrompt } from '../audio/speakPrompt';
 import { AnimatedBackground } from '../components/AnimatedBackground';
@@ -34,6 +35,10 @@ export function WordAlbumScreen({ navigation }: Props) {
       !word.id.startsWith('count-')
     );
   });
+  const ordered = [...ids].sort((a, b) => {
+    const rank = (id: string) => (dueIds.includes(id) ? 0 : progress[id] ? 1 : 2);
+    return rank(a) - rank(b);
+  });
 
   return (
     <AnimatedBackground>
@@ -45,20 +50,31 @@ export function WordAlbumScreen({ navigation }: Props) {
           <Text style={styles.title}>{t('album.title')}</Text>
         </View>
         <ScrollView contentContainerStyle={styles.list}>
-          <Text style={styles.lead}>{t('album.lead')}</Text>
-          <Text style={styles.note}>{t('album.attemptsNote')}</Text>
+          <Stage style={{ gap: 10 }}>
+          <Text style={styles.lead}>{t('album.childLead')}</Text>
           {dueIds.length > 0 ? (
             <PrimaryButton
               label={t('album.practiceDue')}
               onPress={() => navigation.navigate('Review', { wordIds: dueIds })}
             />
           ) : null}
-          {ids.map((id) => {
+          {ordered.map((id) => {
             const stat = progress[id];
             const label = catalog.find((word) => word.id === id) ?? albumWord(id);
             const name = label ? (language === 'tr' ? `${label.en} · ${label.tr}` : label.en) : id;
             const due = stat != null && isDue(stat);
             const counting = stat?.skill === 'count-quantity' || id.startsWith('count-');
+            const mark = !stat
+              ? 'album.markNew'
+              : due
+                ? 'album.due'
+                : counting
+                  ? 'album.markCount'
+                  : heardIndependentCount(stat) > 0
+                    ? 'album.markHeard'
+                    : pictureIndependentCount(stat) > 0
+                      ? 'album.markSeen'
+                      : 'album.markTried';
             return (
               <View key={id} style={styles.card}>
                 <View style={styles.wordRow}>
@@ -82,7 +98,10 @@ export function WordAlbumScreen({ navigation }: Props) {
                       {label?.emoji || '★'}
                     </Text>
                   )}
-                  <Text style={styles.word}>{name}</Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.word}>{name}</Text>
+                    <Text style={styles.mark}>{t(mark)}</Text>
+                  </View>
                 </View>
                 {counting ? <Text style={styles.meta}>{t('album.skillCount')}</Text> : null}
                 {stat ? (
@@ -124,6 +143,7 @@ export function WordAlbumScreen({ navigation }: Props) {
               </View>
             );
           })}
+          </Stage>
         </ScrollView>
       </SafeAreaView>
     </AnimatedBackground>
@@ -140,13 +160,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   backText: { fontWeight: '800', color: colors.forestDeep },
-  title: { fontSize: 22, fontWeight: '900', color: colors.forestDeep },
+  title: { fontSize: 22, fontWeight: '800', color: colors.forestDeep },
   list: { padding: 16, gap: 10, paddingBottom: 40 },
-  lead: { color: colors.muted, fontWeight: '600' },
-  note: { color: colors.forest, fontWeight: '700', marginBottom: 8 },
-  card: { backgroundColor: colors.card, borderRadius: 18, padding: 14 },
-  wordRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  emoji: { fontSize: 32, width: 48, textAlign: 'center' },
+  lead: { color: colors.muted, fontWeight: '600', fontSize: 16, marginBottom: 8 },
+  card: { backgroundColor: colors.card, borderRadius: 22, padding: 14 },
+  wordRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
+  emoji: { fontSize: 44, width: 64, textAlign: 'center' },
   cluster: {
     width: 88,
     flexDirection: 'row',
@@ -157,8 +176,9 @@ const styles = StyleSheet.create({
   },
   piece: { fontSize: 18, lineHeight: 22 },
   swatch: { width: 48, height: 48, borderRadius: 14 },
-  word: { fontSize: 18, fontWeight: '900', color: colors.forestDeep, flex: 1 },
-  meta: { marginTop: 4, color: colors.forest, fontWeight: '700' },
+  word: { fontSize: 18, fontWeight: '800', color: colors.forestDeep },
+  mark: { marginTop: 2, color: colors.forest, fontWeight: '700' },
+  meta: { marginTop: 6, color: colors.muted, fontWeight: '600', fontSize: 13 },
   actions: { flexDirection: 'row', gap: 8, marginTop: 10 },
   action: {
     minHeight: 44,

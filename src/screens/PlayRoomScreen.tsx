@@ -1,6 +1,6 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useMemo, useState } from 'react';
-import { ImageBackground, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ImageBackground, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { speakKidPrompt } from '../audio/speakPrompt';
@@ -32,6 +32,9 @@ export function PlayRoomScreen({ navigation }: Props) {
   const fx = equipped.fx ? COSMETICS.find((c) => c.id === equipped.fx) : null;
   const roomArt = ROOM_ART[equipped.room] ?? ROOM_ART['room-meadow'];
   const treehouse = equipped.room === 'room-treehouse';
+  const { height } = useWindowDimensions();
+  const mascotSize = height < 640 ? 112 : height < 780 ? 148 : 176;
+  const [trayOpen, setTrayOpen] = useState(false);
   const [hatOn, setHatOn] = useState(false);
   const [rabbitOn, setRabbitOn] = useState(false);
   const [doorOpen, setDoorOpen] = useState(false);
@@ -96,7 +99,7 @@ export function PlayRoomScreen({ navigation }: Props) {
                 <Text style={styles.doorMark}>{doorOpen ? '🌿' : ''}</Text>
               </View>
               <GroveMascot
-                size={112}
+                size={mascotSize}
                 outfitEmoji={outfit?.emoji}
                 petEmoji={pet?.emoji}
                 fxEmoji={fx?.emoji}
@@ -146,28 +149,35 @@ export function PlayRoomScreen({ navigation }: Props) {
           </FadeInView>
 
           <View style={styles.tray}>
-            <Text style={styles.trayLabel}>{t('playRoom.outfits')}</Text>
-            {ownedOutfits.length === 0 ? (
-              <Text style={styles.empty}>{t('playRoom.empty')}</Text>
-            ) : (
-              <View style={styles.trayRow}>
-                {ownedOutfits.map((c) => (
-                  <BouncePress
-                    key={c.id}
-                    onPress={() => equipCosmetic(c.id)}
-                    style={[styles.chip, equipped.outfit === c.id && styles.chipOn]}
-                  >
-                    <Text style={styles.chipEmoji}>{c.emoji}</Text>
-                  </BouncePress>
-                ))}
-              </View>
-            )}
-            <PrimaryButton
-              label={t('playRoom.goShop')}
-              tone="coral"
-              style={{ marginTop: 14 }}
-              onPress={() => navigation.navigate('Shop')}
-            />
+            <BouncePress onPress={() => setTrayOpen((open) => !open)} style={styles.trayToggle}>
+              <Text style={styles.trayLabel}>{t('playRoom.outfits')}</Text>
+            </BouncePress>
+            {trayOpen ? (
+              <>
+                {ownedOutfits.length === 0 ? (
+                  <Text style={styles.empty}>{t('playRoom.empty')}</Text>
+                ) : (
+                  <View style={styles.trayRow}>
+                    {ownedOutfits.map((c) => (
+                      <BouncePress
+                        key={c.id}
+                        onPress={() => equipCosmetic(c.id)}
+                        style={[styles.chip, equipped.outfit === c.id && styles.chipOn]}
+                      >
+                        <Text style={styles.chipEmoji}>{c.emoji}</Text>
+                      </BouncePress>
+                    ))}
+                  </View>
+                )}
+                <PrimaryButton
+                  label={t('playRoom.goShop')}
+                  tone="quiet"
+                  large={false}
+                  style={{ marginTop: 14 }}
+                  onPress={() => navigation.navigate('Shop')}
+                />
+              </>
+            ) : null}
           </View>
           </ScrollView>
         </SafeAreaView>
@@ -251,7 +261,8 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     padding: 18,
   },
-  trayLabel: { fontWeight: '800', color: colors.forestDeep, marginBottom: 10 },
+  trayToggle: { minHeight: 44, justifyContent: 'center' },
+  trayLabel: { fontWeight: '800', color: colors.forestDeep },
   empty: { color: colors.muted, fontWeight: '600', marginBottom: 4 },
   trayRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   chip: {

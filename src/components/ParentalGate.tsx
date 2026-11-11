@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
   },
   error: {
     marginTop: 8,
-    color: colors.coral,
+    color: colors.coralInk,
     textAlign: 'center',
     fontWeight: '600',
   },

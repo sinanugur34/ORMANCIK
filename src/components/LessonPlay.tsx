@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { isVoiceNarrationEnabled, promptHasStarted, resetPromptAudible, speakKidPrompt, stopSpeaking, type SpeakOutcome } from '../audio/speakPrompt';
 import type { LessonChoice, LessonStep } from '../data/friendsUnit';
 import { skillAfterPrompt, type WordAttempt } from '../data/learning';
@@ -26,7 +26,7 @@ function ChoiceFace({ choice, size }: { choice: LessonChoice; size: number }) {
   if (choice.swatch) return <View style={[styles.choiceSwatch, { backgroundColor: choice.swatch }]} />;
   if (choice.count != null) return <GlyphCluster glyph={choice.emoji} count={choice.count} fontSize={26} />;
   return (
-    <Text style={[styles.choiceEmoji, { fontSize: Math.round((choice.scale ?? 1) * size * 0.42) }]}>
+    <Text style={[styles.choiceEmoji, { fontSize: Math.round((choice.scale ?? 1) * size * 0.62) }]}>
       {choice.emoji}
     </Text>
   );
@@ -166,7 +166,9 @@ export function LessonPlay({ level, band, hintsEnabled, onWin }: Props) {
   if (!step) return null;
 
   const showPicture = step.kind === 'model' || helpOn;
-  const size = band === '3-5' ? 104 : 84;
+  const { width } = useWindowDimensions();
+  const wide = width >= 700;
+  const size = band === '3-5' ? (wide ? 156 : 124) : band === '6-8' ? (wide ? 128 : 100) : wide ? 116 : 92;
 
   return (
     <View style={styles.wrap}>
@@ -233,7 +235,7 @@ const styles = StyleSheet.create({
   prompt: {
     fontSize: 26,
     lineHeight: 32,
-    fontWeight: '900',
+    fontWeight: '800',
     color: colors.forestDeep,
     textAlign: 'center',
   },
@@ -241,10 +243,10 @@ const styles = StyleSheet.create({
   dot: { width: 12, height: 12, borderRadius: 6, backgroundColor: 'rgba(27,122,74,0.2)' },
   dotOn: { backgroundColor: colors.forest },
   dotNow: { backgroundColor: colors.sun },
-  bad: { textAlign: 'center', marginTop: 10, color: colors.coral, fontWeight: '800' },
+  bad: { textAlign: 'center', marginTop: 10, color: colors.coralInk, fontWeight: '700' },
   good: { textAlign: 'center', marginTop: 10, color: colors.forest, fontWeight: '800' },
   model: { alignItems: 'center', marginTop: 16 },
-  modelEmoji: { fontSize: 72 },
+  modelEmoji: { fontSize: 96 },
   swatch: { width: 72, height: 72, borderRadius: 20 },
   choiceSwatch: { width: '68%', height: '68%', borderRadius: 16 },
   modelWord: {
