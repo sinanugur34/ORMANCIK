@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { migrateCurriculum } from '../src/data/curriculum';
 import { buildFriendsLevel, buildReviewLevel } from '../src/data/friendsUnit';
-import { applyAttempt } from '../src/data/learning';
+import { applyAttempt, mergeWordProgress } from '../src/data/learning';
 import { buildRounds, orderByNeed, shapePixelSize } from '../src/data/rounds';
 
 const oldSave = migrateCurriculum({
@@ -125,12 +125,66 @@ assert.ok(pixels[2]! - pixels[1]! >= 12);
 
 const small = buildReviewLevel(['small'], '9-10', 'en');
 const scales = small?.lesson?.[0]?.choices.map((choice) => choice.scale) ?? [];
+assert.equal(small?.lesson?.[0]?.scale, 0.62);
 assert.ok(new Set(scales).size >= 2);
 assert.ok(small?.lesson?.[0]?.choices.every((choice) => choice.id === 'big' || choice.id === 'small'));
 
 const five = buildReviewLevel(['five'], '9-10', 'en');
-assert.ok(
-  five?.lesson?.[0]?.choices.every((choice) => ['one', 'two', 'three', 'four', 'five'].includes(choice.id)),
-);
+const fiveChoices = five?.lesson?.[0]?.choices ?? [];
+assert.ok(fiveChoices.every((choice) => ['one', 'two', 'three', 'four', 'five'].includes(choice.id)));
+assert.equal(five?.lesson?.[0]?.count, 5);
+assert.equal(five?.lesson?.[0]?.emoji, '🌟');
+assert.ok(fiveChoices.every((choice) => choice.emoji === '🌟' && (choice.count ?? 0) >= 1));
+assert.equal(new Set(fiveChoices.map((choice) => choice.count)).size, fiveChoices.length);
+
+const merged = mergeWordProgress({
+  red: {
+    id: 'red',
+    skill: 'listen-recognize',
+    independent: 1,
+    hinted: 0,
+    firstTry: 1,
+    attempts: 2,
+    lastAt: 10,
+    reviewAt: 20,
+  },
+  'color.red': {
+    id: 'color.red',
+    skill: 'listen-recognize',
+    independent: 2,
+    hinted: 1,
+    firstTry: 1,
+    attempts: 4,
+    lastAt: 30,
+    reviewAt: 5,
+  },
+  berry: {
+    id: 'berry',
+    skill: 'listen-recognize',
+    independent: 1,
+    hinted: 0,
+    firstTry: 1,
+    attempts: 1,
+    lastAt: 1,
+    reviewAt: 1,
+  },
+  cat: {
+    id: 'cat',
+    skill: 'listen-recognize',
+    independent: 3,
+    hinted: 0,
+    firstTry: 3,
+    attempts: 3,
+    lastAt: 9,
+    reviewAt: 9,
+  },
+});
+assert.equal(merged.red, undefined);
+assert.equal(merged.berry, undefined);
+assert.equal(merged['color.red']?.attempts, 6);
+assert.equal(merged['color.red']?.independent, 3);
+assert.equal(merged['color.red']?.reviewAt, 5);
+assert.equal(merged['color.pink']?.attempts, 1);
+assert.equal(merged.cat?.independent, 3);
 
 console.log('learning review checks passed');

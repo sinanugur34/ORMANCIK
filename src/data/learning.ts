@@ -1,3 +1,5 @@
+import { LEGACY_COLOR_IDS } from '../theme/colorNames';
+
 /** Word-level learning record. Stored on the child profile, on device. */
 
 export type EnglishLevel = 'new' | 'some' | 'ready';
@@ -59,4 +61,56 @@ export function applyAttempt(prev: WordStat | undefined, attempt: WordAttempt, n
 
 export function isDue(stat: WordStat, now = Date.now()): boolean {
   return stat.reviewAt > 0 && stat.reviewAt <= now;
+}
+
+export function canonicalWordId(id: string): string {
+  return LEGACY_COLOR_IDS[id] ?? id;
+}
+
+function asCount(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
+}
+
+function normalizeStat(id: string, stat: Partial<WordStat>): WordStat {
+  return {
+    id,
+    skill: stat.skill === 'count-quantity' ? 'count-quantity' : 'listen-recognize',
+    independent: asCount(stat.independent),
+    hinted: asCount(stat.hinted),
+    firstTry: asCount(stat.firstTry),
+    attempts: asCount(stat.attempts),
+    lastAt: asCount(stat.lastAt),
+    reviewAt: asCount(stat.reviewAt),
+  };
+}
+
+function combineStats(a: WordStat, b: WordStat): WordStat {
+  const reviewAt =
+    a.reviewAt > 0 && b.reviewAt > 0 ? Math.min(a.reviewAt, b.reviewAt) : Math.max(a.reviewAt, b.reviewAt);
+  return {
+    id: a.id,
+    skill: a.skill === b.skill ? a.skill : a.lastAt >= b.lastAt ? a.skill : b.skill,
+    independent: a.independent + b.independent,
+    hinted: a.hinted + b.hinted,
+    firstTry: a.firstTry + b.firstTry,
+    attempts: a.attempts + b.attempts,
+    lastAt: Math.max(a.lastAt, b.lastAt),
+    reviewAt,
+  };
+}
+
+/** One color keeps one record. Older names such as `red` or `berry` fold into `color.*`. */
+export function mergeWordProgress(
+  raw: Record<string, Partial<WordStat> | undefined> | undefined,
+): Record<string, WordStat> {
+  const out: Record<string, WordStat> = {};
+  if (!raw) return out;
+  for (const [id, stat] of Object.entries(raw)) {
+    if (!stat || typeof stat !== 'object') continue;
+    const key = canonicalWordId(id);
+    const next = normalizeStat(key, stat);
+    const prev = out[key];
+    out[key] = prev ? combineStats(prev, next) : next;
+  }
+  return out;
 }

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { speakKidPrompt, stopSpeaking } from '../audio/speakPrompt';
-import type { LessonStep } from '../data/friendsUnit';
+import type { LessonChoice, LessonStep } from '../data/friendsUnit';
 import type { WordAttempt } from '../data/learning';
 import { starsFromMistakes, type LevelDef } from '../data/levels';
 import { useT } from '../i18n';
@@ -9,6 +9,28 @@ import type { AgeBand } from '../theme/colors';
 import { colors } from '../theme/colors';
 import { ListenBar } from './ListenBar';
 import type { LevelWin } from './levelWin';
+
+function GlyphCluster({ glyph, count, fontSize }: { glyph: string; count: number; fontSize: number }) {
+  return (
+    <View style={styles.cluster}>
+      {Array.from({ length: count }, (_, i) => (
+        <Text key={i} style={{ fontSize, lineHeight: fontSize + 4 }}>
+          {glyph}
+        </Text>
+      ))}
+    </View>
+  );
+}
+
+function ChoiceFace({ choice, size }: { choice: LessonChoice; size: number }) {
+  if (choice.swatch) return <View style={[styles.choiceSwatch, { backgroundColor: choice.swatch }]} />;
+  if (choice.count != null) return <GlyphCluster glyph={choice.emoji} count={choice.count} fontSize={26} />;
+  return (
+    <Text style={[styles.choiceEmoji, { fontSize: Math.round((choice.scale ?? 1) * size * 0.42) }]}>
+      {choice.emoji}
+    </Text>
+  );
+}
 
 type Props = {
   level: LevelDef;
@@ -145,8 +167,12 @@ export function LessonPlay({ level, band, hintsEnabled, onWin }: Props) {
         <View style={styles.model}>
           {step.swatch ? (
             <View style={[styles.swatch, { backgroundColor: step.swatch }]} />
+          ) : step.count != null ? (
+            <GlyphCluster glyph={step.emoji} count={step.count} fontSize={32} />
           ) : (
-            <Text style={styles.modelEmoji}>{step.emoji}</Text>
+            <Text style={[styles.modelEmoji, step.scale != null ? { fontSize: Math.round(48 * step.scale) } : null]}>
+              {step.emoji}
+            </Text>
           )}
           {step.kind === 'model' ? <Text style={styles.modelWord}>{step.say}</Text> : null}
           {helpOn && hintsEnabled ? <Text style={styles.hint}>{step.hintTr}</Text> : null}
@@ -165,15 +191,12 @@ export function LessonPlay({ level, band, hintsEnabled, onWin }: Props) {
               accessibilityRole="button"
               accessibilityLabel={choice.labelEn}
               onPress={() => onChoose(choice.id)}
-              style={[styles.choice, { width: size, height: size }]}
+              style={[
+                styles.choice,
+                choice.count == null ? { width: size, height: size } : styles.choiceCount,
+              ]}
             >
-              {choice.swatch ? (
-                <View style={[styles.choiceSwatch, { backgroundColor: choice.swatch }]} />
-              ) : (
-                <Text style={[styles.choiceEmoji, { fontSize: Math.round((choice.scale ?? 1) * size * 0.42) }]}>
-                  {choice.emoji}
-                </Text>
-              )}
+              <ChoiceFace choice={choice} size={size} />
             </Pressable>
           ))}
         </View>
@@ -244,6 +267,15 @@ const styles = StyleSheet.create({
     minHeight: 72,
   },
   choiceEmoji: { fontSize: 40 },
+  choiceCount: { maxWidth: 168, paddingVertical: 8, paddingHorizontal: 8 },
+  cluster: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 2,
+    maxWidth: 148,
+  },
   help: { alignSelf: 'center', marginTop: 16, minHeight: 44, justifyContent: 'center' },
   helpText: { fontWeight: '800', color: colors.forest },
 });

@@ -14,6 +14,8 @@ export type LessonChoice = {
   swatch?: string;
   /** Relative size of the same picture, so big and small stay the same kind. */
   scale?: number;
+  /** How many separate copies of `emoji` this choice shows. */
+  count?: number;
 };
 
 export type LessonStep = {
@@ -26,6 +28,8 @@ export type LessonStep = {
   hintTr: string;
   choices: LessonChoice[];
   swatch?: string;
+  scale?: number;
+  count?: number;
 };
 
 export type CatalogWord = {
@@ -35,6 +39,8 @@ export type CatalogWord = {
   en: string;
   swatch?: string;
   scale?: number;
+  /** Repeated copies of the single emoji. Keeps four and five countable. */
+  count?: number;
   tr: string;
   model: string;
   modelClip: string;
@@ -147,11 +153,11 @@ const COLOR_WORDS: CatalogWord[] = [
 
 const REVIEW_EXTRA: CatalogWord[] = [
   ...COLOR_WORDS,
-  { id: 'one', emoji: '🍎', emojiAlt: '🌟', en: 'one', tr: 'bir', model: '', modelClip: '', find: 'Find one.', findClip: '', transfer: 'Touch one.', transferClip: '' },
-  { id: 'two', emoji: '🍎🍎', emojiAlt: '🌟🌟', en: 'two', tr: 'iki', model: '', modelClip: '', find: 'Find two.', findClip: '', transfer: 'Touch two.', transferClip: '' },
-  { id: 'three', emoji: '🍎🍎🍎', emojiAlt: '🌟🌟🌟', en: 'three', tr: 'üç', model: '', modelClip: '', find: 'Find three.', findClip: '', transfer: 'Touch three.', transferClip: '' },
-  { id: 'four', emoji: '🍎🍎🍎🍎', emojiAlt: '🌟🌟🌟🌟', en: 'four', tr: 'dört', model: '', modelClip: '', find: 'Find four.', findClip: '', transfer: 'Touch four.', transferClip: '' },
-  { id: 'five', emoji: '🍎🍎🍎🍎🍎', emojiAlt: '🌟🌟🌟🌟🌟', en: 'five', tr: 'beş', model: '', modelClip: '', find: 'Find five.', findClip: '', transfer: 'Touch five.', transferClip: '' },
+  { id: 'one', emoji: '🍎', emojiAlt: '🌟', count: 1, en: 'one', tr: 'bir', model: '', modelClip: '', find: 'Find one.', findClip: '', transfer: 'Touch one.', transferClip: '' },
+  { id: 'two', emoji: '🍎', emojiAlt: '🌟', count: 2, en: 'two', tr: 'iki', model: '', modelClip: '', find: 'Find two.', findClip: '', transfer: 'Touch two.', transferClip: '' },
+  { id: 'three', emoji: '🍎', emojiAlt: '🌟', count: 3, en: 'three', tr: 'üç', model: '', modelClip: '', find: 'Find three.', findClip: '', transfer: 'Touch three.', transferClip: '' },
+  { id: 'four', emoji: '🍎', emojiAlt: '🌟', count: 4, en: 'four', tr: 'dört', model: '', modelClip: '', find: 'Find four.', findClip: '', transfer: 'Touch four.', transferClip: '' },
+  { id: 'five', emoji: '🍎', emojiAlt: '🌟', count: 5, en: 'five', tr: 'beş', model: '', modelClip: '', find: 'Find five.', findClip: '', transfer: 'Touch five.', transferClip: '' },
   { id: 'big', emoji: '●', emojiAlt: '●', scale: 1.65, en: 'big', tr: 'büyük', model: '', modelClip: '', find: 'Find the big one.', findClip: '', transfer: 'Touch the big one.', transferClip: '' },
   { id: 'small', emoji: '●', emojiAlt: '●', scale: 0.62, en: 'small', tr: 'küçük', model: '', modelClip: '', find: 'Find the small one.', findClip: '', transfer: 'Touch the small one.', transferClip: '' },
   { id: 'circle', emoji: '●', emojiAlt: '⬤', en: 'circle', tr: 'daire', model: '', modelClip: '', find: 'Find the circle.', findClip: '', transfer: 'Touch the circle.', transferClip: '' },
@@ -217,6 +223,7 @@ export function albumWord(id: string): AlbumWord | null {
 
 function sameLook(a: CatalogWord, b: CatalogWord, kind: LessonStep['kind']): boolean {
   if (a.swatch || b.swatch) return a.swatch === b.swatch;
+  if (a.count != null || b.count != null) return a.count === b.count && picture(a, kind) === picture(b, kind);
   if (a.scale != null || b.scale != null) return picture(a, kind) === picture(b, kind) && a.scale === b.scale;
   return picture(a, kind) === picture(b, kind);
 }
@@ -280,6 +287,7 @@ function choicesFor(
     labelTr: w.tr,
     swatch: w.swatch,
     scale: w.scale,
+    count: w.count,
   }));
 }
 
@@ -301,6 +309,8 @@ function step(
     emoji: picture(word, kind),
     hintTr: word.tr,
     swatch: word.swatch,
+    scale: word.scale,
+    count: word.count,
     choices: kind === 'model' ? [] : choicesFor(word, band, salt, kind, englishLevel, pool),
   };
 }

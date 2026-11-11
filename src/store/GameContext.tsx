@@ -15,7 +15,7 @@ import { TOTAL_LEVELS } from '../data/islands';
 import { isDeviceTurkish } from '../i18n/deviceLocale';
 import { setLanguage as setI18nLanguage, t, type Language } from '../i18n';
 import { CURRICULUM_VERSION, migrateCurriculum } from '../data/curriculum';
-import { applyAttempt, type EnglishLevel, type WordAttempt, type WordStat } from '../data/learning';
+import { applyAttempt, mergeWordProgress, type EnglishLevel, type WordAttempt, type WordStat } from '../data/learning';
 import { ageToBand, AgeBand } from '../theme/colors';
 
 const STORAGE_KEY = 'ormancik-v1';
@@ -225,7 +225,7 @@ function learningDefaults(raw?: Partial<ChildProfile>): Pick<
   return {
     hintsEnabled: raw?.hintsEnabled ?? true,
     englishLevel: level === 'some' || level === 'ready' ? level : 'new',
-    wordProgress: raw?.wordProgress && typeof raw.wordProgress === 'object' ? raw.wordProgress : {},
+    wordProgress: mergeWordProgress(raw?.wordProgress),
     sessionLimit: typeof raw?.sessionLimit === 'number' ? Math.max(0, Math.min(20, Math.round(raw.sessionLimit))) : 8,
     levelStars: raw?.levelStars && typeof raw.levelStars === 'object' ? raw.levelStars : {},
   };

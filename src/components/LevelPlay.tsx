@@ -913,9 +913,15 @@ function ArcadeLevel({ level, band, hintsEnabled, wordProgress = EMPTY_PROGRESS,
                 <BouncePress
                   key={`${progress}-group-${n}`}
                   onPress={() => onCountWord(n)}
-                  style={[styles.countGroup, { minWidth: size, minHeight: size }]}
+                  style={styles.countGroup}
                 >
-                  <Text style={styles.countObject}>{countRound.emoji.repeat(n)}</Text>
+                  <View style={styles.countCluster}>
+                    {Array.from({ length: n }, (_, i) => (
+                      <Text key={`${progress}-group-${n}-${i}`} style={styles.countPiece}>
+                        {countRound.emoji}
+                      </Text>
+                    ))}
+                  </View>
                 </BouncePress>
               ))}
             </View>
@@ -1315,9 +1321,20 @@ const styles = StyleSheet.create({
     backgroundColor: colors.cream,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    minWidth: 72,
+    minHeight: 72,
   },
+  countCluster: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 2,
+    maxWidth: 132,
+  },
+  countPiece: { fontSize: 28, lineHeight: 34 },
   sizeHit: { alignItems: 'center', justifyContent: 'center', marginHorizontal: 8 },
   binRow: { flexDirection: 'row', justifyContent: 'center', gap: 10, flexWrap: 'wrap' },
   bin: {

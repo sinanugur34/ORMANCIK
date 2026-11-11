@@ -7,7 +7,7 @@ import { AnimatedBackground } from '../components/AnimatedBackground';
 import { BouncePress } from '../components/Motion';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { albumWord, listAlbumWords } from '../data/friendsUnit';
-import { isDue } from '../data/learning';
+import { isDue, mergeWordProgress } from '../data/learning';
 import { useT } from '../i18n';
 import { RootStackParamList } from '../navigation/types';
 import { useGame } from '../store/GameContext';
@@ -19,9 +19,10 @@ export function WordAlbumScreen({ navigation }: Props) {
   const t = useT();
   const { wordProgress, language } = useGame();
   const catalog = useMemo(() => listAlbumWords(), []);
-  const ids = Array.from(new Set([...catalog.map((word) => word.id), ...Object.keys(wordProgress)]));
+  const progress = useMemo(() => mergeWordProgress(wordProgress), [wordProgress]);
+  const ids = Array.from(new Set([...catalog.map((word) => word.id), ...Object.keys(progress)]));
   const dueIds = ids.filter((id) => {
-    const stat = wordProgress[id];
+    const stat = progress[id];
     const word = albumWord(id);
     return (
       stat != null &&
@@ -51,7 +52,7 @@ export function WordAlbumScreen({ navigation }: Props) {
             />
           ) : null}
           {ids.map((id) => {
-            const stat = wordProgress[id];
+            const stat = progress[id];
             const label = catalog.find((word) => word.id === id) ?? albumWord(id);
             const name = label ? (language === 'tr' ? `${label.en} · ${label.tr}` : label.en) : id;
             const due = stat != null && isDue(stat);
