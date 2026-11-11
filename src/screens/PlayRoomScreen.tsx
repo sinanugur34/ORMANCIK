@@ -1,5 +1,5 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ImageBackground, StyleSheet, Text, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -25,7 +25,7 @@ const ROOM_ART: Record<string, number> = {
 
 export function PlayRoomScreen({ navigation }: Props) {
   const t = useT();
-  const { equipped, ownedCosmeticIds, premium, equipCosmetic, recordLearning } = useGame();
+  const { equipped, ownedCosmeticIds, premium, equipCosmetic } = useGame();
 
   const outfit = COSMETICS.find((c) => c.id === equipped.outfit);
   const pet = COSMETICS.find((c) => c.id === equipped.pet);
@@ -35,37 +35,18 @@ export function PlayRoomScreen({ navigation }: Props) {
   const [hatOn, setHatOn] = useState(false);
   const [rabbitOn, setRabbitOn] = useState(false);
   const [doorOpen, setDoorOpen] = useState(false);
-  const roomDone = useRef(new Set<string>());
-  const roomMissed = useRef(new Set<string>());
-
-  const finishRoomTask = (id: string, right: boolean) => {
-    if (roomDone.current.has(id)) return;
-    if (!right) {
-      if (!roomMissed.current.has(id)) {
-        roomMissed.current.add(id);
-        recordLearning([
-          { id, correct: false, independent: false, firstTry: false, skill: 'listen-recognize', variant: 'listen' },
-        ]);
-      }
-      return;
-    }
-    roomDone.current.add(id);
-    const helped = roomMissed.current.has(id);
-    recordLearning([
-      {
-        id,
-        correct: true,
-        independent: !helped,
-        firstTry: !helped,
-        skill: 'listen-recognize',
-        variant: 'listen',
-      },
-    ]);
-  };
+  const roomLine = !hatOn
+    ? { text: 'Put on the hat.', clipId: 'room-hat' }
+    : !rabbitOn
+      ? { text: 'Put the rabbit on the mat.', clipId: undefined }
+      : !doorOpen
+        ? { text: 'Open the door.', clipId: undefined }
+        : null;
 
   useEffect(() => {
-    void speakKidPrompt('Put on the hat.', { lang: 'en', clipId: 'room-hat' });
-  }, []);
+    if (!roomLine) return;
+    void speakKidPrompt(roomLine.text, { lang: 'en', clipId: roomLine.clipId });
+  }, [roomLine?.text, roomLine?.clipId]);
 
   const ownedOutfits = useMemo(
     () =>
@@ -107,29 +88,18 @@ export function PlayRoomScreen({ navigation }: Props) {
             <Text style={styles.caption}>
               {doorOpen ? t('playRoom.taskDone') : rabbitOn ? t('playRoom.taskDoor') : hatOn ? t('playRoom.taskRabbit') : t('playRoom.task')}
             </Text>
-            <ListenBar
-              text={hatOn ? (rabbitOn ? 'Open the door.' : 'Put the rabbit on the mat.') : 'Put on the hat.'}
-              clipId={hatOn ? undefined : 'room-hat'}
-              lang="en"
-            />
+            {roomLine ? <ListenBar text={roomLine.text} clipId={roomLine.clipId} lang="en" /> : null}
             <View style={styles.taskRow}>
               <BouncePress
-                onPress={() => {
-                  setHatOn(true);
-                  finishRoomTask('room.hat', true);
-                }}
+                onPress={() => setHatOn(true)}
                 style={styles.taskBtn}
               >
                 <Text style={styles.chipEmoji}>🎩</Text>
               </BouncePress>
               <BouncePress
                 onPress={() => {
-                  if (!hatOn) {
-                    finishRoomTask('room.hat', false);
-                    return;
-                  }
+                  if (!hatOn) return;
                   setRabbitOn(true);
-                  finishRoomTask('room.rabbit', true);
                 }}
                 style={styles.taskBtn}
               >
@@ -137,12 +107,8 @@ export function PlayRoomScreen({ navigation }: Props) {
               </BouncePress>
               <BouncePress
                 onPress={() => {
-                  if (!rabbitOn) {
-                    finishRoomTask(hatOn ? 'room.rabbit' : 'room.hat', false);
-                    return;
-                  }
+                  if (!rabbitOn) return;
                   setDoorOpen(true);
-                  finishRoomTask('room.door', true);
                 }}
                 style={styles.taskBtn}
               >

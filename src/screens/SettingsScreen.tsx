@@ -165,7 +165,13 @@ export function SettingsScreen({ navigation }: Props) {
           ? t('settings.gateAdd')
           : gate?.type === 'delete'
             ? t('settings.gateDelete')
-            : t('settings.gateReset');
+            : gate?.type === 'replay'
+              ? t('settings.gateReplay')
+              : gate?.type === 'keepReplay'
+                ? t('settings.gateKeep')
+                : gate?.type === 'homeTask'
+                  ? t('settings.gateHome')
+                  : t('settings.gateReset');
 
   const pendingSwitch = profiles.find((p) => p.id === switchConfirmId) ?? null;
   const pendingDelete = profiles.find((p) => p.id === deleteConfirmId) ?? null;
@@ -194,11 +200,12 @@ export function SettingsScreen({ navigation }: Props) {
   };
 
   const familyRows = Object.values(wordProgress)
-    .filter((stat) => stat.attempts > 0 && stat.skill !== 'count-quantity')
+    .filter((stat) => stat.attempts > 0 && stat.skill !== 'count-quantity' && !stat.id.startsWith('room.'))
     .sort((a, b) => b.lastAt - a.lastAt)
     .slice(0, 6)
-    .map((stat) => {
+    .flatMap((stat) => {
       const word = albumWord(stat.id);
+      if (!word) return [];
       const status = familyStatus(stat);
       const statusKey =
         status === 'recalled'
@@ -208,8 +215,8 @@ export function SettingsScreen({ navigation }: Props) {
             : status === 'helped'
               ? 'settings.statusHelped'
               : 'settings.statusMet';
-      const name = word ? (language === 'tr' ? `${word.en} · ${word.tr}` : word.en) : stat.id;
-      return { id: stat.id, name, statusKey } as const;
+      const name = language === 'tr' ? `${word.en} · ${word.tr}` : word.en;
+      return [{ id: stat.id, name, statusKey } as const];
     });
 
   return (

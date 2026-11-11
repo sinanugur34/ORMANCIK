@@ -20,7 +20,9 @@ export function WordAlbumScreen({ navigation }: Props) {
   const { wordProgress, language } = useGame();
   const catalog = useMemo(() => listAlbumWords(), []);
   const progress = useMemo(() => mergeWordProgress(wordProgress), [wordProgress]);
-  const ids = Array.from(new Set([...catalog.map((word) => word.id), ...Object.keys(progress)]));
+  const ids = Array.from(new Set([...catalog.map((word) => word.id), ...Object.keys(progress)])).filter(
+    (id) => !id.startsWith('room.') && (catalog.some((word) => word.id === id) || albumWord(id) != null),
+  );
   const dueIds = ids.filter((id) => {
     const stat = progress[id];
     const word = albumWord(id);

@@ -217,6 +217,40 @@ assert.equal(declined.replayOffer, false);
 const settled = migrateCurriculum({ ...declined, clearedLevelIds: [1, 12] });
 assert.equal(settled.replayOffer, false);
 assert.ok(settled.clearedLevelIds.includes(1));
+const reopened = migrateCurriculum({
+  contentVersion: badVersion.contentVersion,
+  clearedLevelIds: badVersion.clearedLevelIds,
+  friendsIntro: badVersion.friendsIntro,
+  legacyLevelIds: badVersion.legacyLevelIds,
+  replayOffer: badVersion.replayOffer,
+});
+assert.equal(reopened.replayOffer, true);
+assert.ok(reopened.clearedLevelIds.includes(1));
+
+const withoutRoom = mergeWordProgress({
+  'room.hat': {
+    id: 'room.hat',
+    skill: 'listen-recognize',
+    independent: 1,
+    hinted: 0,
+    firstTry: 1,
+    attempts: 1,
+    lastAt: 1,
+    reviewAt: 1,
+  },
+  cat: {
+    id: 'cat',
+    skill: 'listen-recognize',
+    independent: 1,
+    hinted: 0,
+    firstTry: 1,
+    attempts: 1,
+    lastAt: 2,
+    reviewAt: 2,
+  },
+});
+assert.equal(withoutRoom['room.hat'], undefined);
+assert.equal(withoutRoom.cat?.attempts, 1);
 
 const repaired = migrateCurriculum({
   contentVersion: 2,

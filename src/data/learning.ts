@@ -153,7 +153,7 @@ export function commitAttempts(
   const wordProgress = mergeWordProgress(prev);
   for (const attempt of attempts) {
     const id = canonicalWordId(attempt.id);
-    if (!id || id === 'color.unknown') continue;
+    if (!id || id === 'color.unknown' || id.startsWith('room.')) continue;
     wordProgress[id] = applyAttempt(wordProgress[id], { ...attempt, id }, now);
   }
   return wordProgress;
@@ -166,7 +166,7 @@ export function mergeWordProgress(
   const out: Record<string, WordStat> = {};
   if (!raw) return out;
   for (const [id, stat] of Object.entries(raw)) {
-    if (!stat || typeof stat !== 'object') continue;
+    if (!stat || typeof stat !== 'object' || id.startsWith('room.')) continue;
     const key = canonicalWordId(id);
     const next = normalizeStat(key, stat);
     const prev = out[key];

@@ -279,6 +279,7 @@ function profileFromSaved(raw: Partial<ChildProfile> & { name?: string; age?: nu
     contentVersion: raw.contentVersion,
     friendsIntro: raw.friendsIntro,
     legacyLevelIds: raw.legacyLevelIds,
+    replayOffer: raw.replayOffer,
   });
   return {
     ...makeProfile(raw.name || t('common.player'), raw.age ?? 5, {
