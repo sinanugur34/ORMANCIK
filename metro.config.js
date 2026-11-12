@@ -28,8 +28,23 @@ function readBody(req) {
   });
 }
 
-function sendCors(res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+const MAX_TTS_CHARS = 180;
+let ttsInflight = 0;
+const MAX_TTS_INFLIGHT = 2;
+
+function sendCors(req, res) {
+  const origin = req.headers.origin;
+  if (!origin) return;
+  let allowed = false;
+  try {
+    const host = new URL(origin).hostname;
+    allowed = host === 'localhost' || host === '127.0.0.1';
+  } catch {
+    allowed = false;
+  }
+  if (!allowed) return;
+  res.setHeader('Access-Control-Allow-Origin', origin);
+  res.setHeader('Vary', 'Origin');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
 }
@@ -48,7 +63,7 @@ config.server = {
         return middleware(req, res, next);
       }
 
-      sendCors(res);
+      sendCors(req, res);
 
       if (req.method === 'OPTIONS') {
         res.statusCode = 204;
@@ -82,24 +97,43 @@ config.server = {
           res.end(JSON.stringify({ error: 'missing text' }));
           return;
         }
+        if (text.length > MAX_TTS_CHARS) {
+          res.statusCode = 413;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'text too long' }));
+          return;
+        }
+        if (ttsInflight >= MAX_TTS_INFLIGHT) {
+          res.statusCode = 429;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: 'too many syntheses' }));
+          return;
+        }
 
-        const { synthesizeToFile, resolveVoice, cacheKey } = await loadSynth();
-        const voice = resolveVoice(voiceHint);
-        const file = await synthesizeToFile(text, { voice });
-        const buf = fs.readFileSync(file);
+        ttsInflight += 1;
+        try {
+          const { synthesizeToFile, resolveVoice, cacheKey } = await loadSynth();
+          const voice = resolveVoice(voiceHint);
+          const file = await synthesizeToFile(text, { voice });
+          const buf = fs.readFileSync(file);
 
-        res.statusCode = 200;
-        res.setHeader('Content-Type', 'audio/mpeg');
-        res.setHeader('Cache-Control', 'public, max-age=86400');
-        res.setHeader('X-Ormancik-Voice', voice);
-        res.setHeader('X-Ormancik-Cache-Key', cacheKey(text, voice));
-        res.setHeader('Content-Length', String(buf.length));
-        res.end(buf);
+          res.statusCode = 200;
+          res.setHeader('Content-Type', 'audio/mpeg');
+          res.setHeader('Cache-Control', 'public, max-age=86400');
+          res.setHeader('X-Ormancik-Voice', voice);
+          res.setHeader('X-Ormancik-Cache-Key', cacheKey(text, voice));
+          res.setHeader('Content-Length', String(buf.length));
+          res.end(buf);
+        } finally {
+          ttsInflight = Math.max(0, ttsInflight - 1);
+        }
       })().catch((err) => {
         console.error('[api/tts]', err);
-        res.statusCode = 502;
-        res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ error: String(err?.message || err) }));
+        if (!res.writableEnded) {
+          res.statusCode = 502;
+          res.setHeader('Content-Type', 'application/json');
+          res.end(JSON.stringify({ error: String(err?.message || err) }));
+        }
       });
     };
   },

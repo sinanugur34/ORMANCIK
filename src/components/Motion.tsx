@@ -36,11 +36,13 @@ export function BouncePress({
   onPress,
   style,
   disabled,
+  accessibilityLabel,
 }: {
   children?: React.ReactNode;
   onPress?: () => void;
   style?: StyleProp<ViewStyle>;
   disabled?: boolean;
+  accessibilityLabel?: string;
 }) {
   const scale = useSharedValue(1);
   const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
@@ -49,6 +51,8 @@ export function BouncePress({
     <Animated.View style={[style, anim]}>
       <Pressable
         accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityState={{ disabled: !!disabled }}
         disabled={disabled}
         onPressIn={() => {
           scale.value = withTiming(0.96, { duration: 80 });

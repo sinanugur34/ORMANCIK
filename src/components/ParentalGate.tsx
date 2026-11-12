@@ -1,13 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import {
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useT } from '../i18n';
+import { useGame } from '../store/GameContext';
 import { colors } from '../theme/colors';
 
 type Props = {
@@ -17,37 +11,43 @@ type Props = {
   onCancel: () => void;
 };
 
-export function ParentalGate({
-  visible,
-  title,
-  onSuccess,
-  onCancel,
-}: Props) {
+export function ParentalGate({ visible, title, onSuccess, onCancel }: Props) {
   const t = useT();
-  const challenge = useMemo(() => {
-    const a = 4 + Math.floor(Math.random() * 5);
-    const b = 3 + Math.floor(Math.random() * 6);
-    return { a, b, answer: a + b };
-  }, [visible]);
-
-  const [value, setValue] = useState('');
-  const [error, setError] = useState(false);
+  const { parentPinSet, setParentPin, verifyParentPin } = useGame();
+  const [first, setFirst] = useState('');
+  const [second, setSecond] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (visible) {
-      setValue('');
-      setError(false);
-    }
-  }, [visible, challenge.answer]);
+    if (!visible) return;
+    setFirst('');
+    setSecond('');
+    setError(null);
+  }, [visible]);
+
+  const digits = (value: string) => value.replace(/\D/g, '').slice(0, 4);
 
   const submit = () => {
-    if (Number(value) === challenge.answer) {
-      setValue('');
-      setError(false);
-      onSuccess();
-    } else {
-      setError(true);
+    if (!parentPinSet) {
+      if (first.length !== 4 || second.length !== 4) {
+        setError(t('gate.pinHint'));
+        return;
+      }
+      if (first !== second) {
+        setError(t('gate.pinMismatch'));
+        setSecond('');
+        return;
+      }
+      if (setParentPin(first)) onSuccess();
+      return;
     }
+    const result = verifyParentPin(first);
+    if (result === 'ok') {
+      onSuccess();
+      return;
+    }
+    setFirst('');
+    setError(result === 'locked' ? t('gate.pinLocked') : t('gate.wrong'));
   };
 
   return (
@@ -55,37 +55,43 @@ export function ParentalGate({
       <View style={styles.backdrop}>
         <View style={styles.card}>
           <Text style={styles.eyebrow}>{t('gate.eyebrow')}</Text>
-          <Text style={styles.title}>{title ?? t('gate.defaultTitle')}</Text>
-          <Text style={styles.prompt}>
-            {challenge.a} + {challenge.b} = ?
-          </Text>
+          <Text style={styles.title}>{title ?? t(parentPinSet ? 'gate.pinEnter' : 'gate.pinSet')}</Text>
+          <Text style={styles.help}>{t('gate.pinHint')}</Text>
           <TextInput
-            value={value}
+            value={first}
             onChangeText={(txt) => {
-              setValue(txt.replace(/[^0-9]/g, ''));
-              setError(false);
+              setFirst(digits(txt));
+              setError(null);
             }}
             keyboardType="number-pad"
+            secureTextEntry
             style={styles.input}
-            placeholder={t('gate.answerPlaceholder')}
+            placeholder={parentPinSet ? t('gate.pinEnter') : t('gate.pinSet')}
             placeholderTextColor={colors.muted}
-            maxLength={3}
+            maxLength={4}
             autoFocus
           />
-          {error ? <Text style={styles.error}>{t('gate.wrong')}</Text> : null}
+          {!parentPinSet ? (
+            <TextInput
+              value={second}
+              onChangeText={(txt) => {
+                setSecond(digits(txt));
+                setError(null);
+              }}
+              keyboardType="number-pad"
+              secureTextEntry
+              style={styles.input}
+              placeholder={t('gate.pinConfirm')}
+              placeholderTextColor={colors.muted}
+              maxLength={4}
+            />
+          ) : null}
+          {error ? <Text style={styles.error}>{error}</Text> : null}
           <View style={styles.row}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={onCancel}
-              style={({ pressed }) => [styles.btn, styles.ghost, { opacity: pressed ? 0.85 : 1 }]}
-            >
+            <Pressable accessibilityRole="button" onPress={onCancel} style={styles.ghost}>
               <Text style={styles.ghostText}>{t('gate.cancel')}</Text>
             </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={submit}
-              style={({ pressed }) => [styles.btn, styles.primary, { opacity: pressed ? 0.85 : 1 }]}
-            >
+            <Pressable accessibilityRole="button" onPress={submit} style={styles.primary}>
               <Text style={styles.primaryText}>{t('gate.confirm')}</Text>
             </Pressable>
           </View>
@@ -105,7 +111,7 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '100%',
-    maxWidth: 360,
+    maxWidth: 380,
     backgroundColor: colors.cream,
     borderRadius: 24,
     padding: 24,
@@ -123,15 +129,9 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: colors.forestDeep,
   },
-  prompt: {
-    marginTop: 20,
-    fontSize: 36,
-    fontWeight: '800',
-    color: colors.forest,
-    textAlign: 'center',
-  },
+  help: { marginTop: 8, color: colors.muted, fontWeight: '600' },
   input: {
-    marginTop: 16,
+    marginTop: 14,
     borderWidth: 2,
     borderColor: colors.mint,
     borderRadius: 16,
@@ -145,33 +145,25 @@ const styles = StyleSheet.create({
   },
   error: {
     marginTop: 8,
-    color: colors.coral,
+    color: colors.coralInk,
     textAlign: 'center',
     fontWeight: '600',
   },
-  row: {
-    flexDirection: 'row',
-    gap: 12,
-    marginTop: 20,
-  },
-  btn: {
+  row: { flexDirection: 'row', gap: 12, marginTop: 20 },
+  ghost: {
     flex: 1,
     paddingVertical: 14,
     borderRadius: 16,
     alignItems: 'center',
-  },
-  ghost: {
     backgroundColor: 'rgba(15,61,46,0.08)',
   },
-  ghostText: {
-    fontWeight: '700',
-    color: colors.forestDeep,
-  },
+  ghostText: { fontWeight: '700', color: colors.forestDeep },
   primary: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 16,
+    alignItems: 'center',
     backgroundColor: colors.forest,
   },
-  primaryText: {
-    fontWeight: '800',
-    color: colors.white,
-  },
+  primaryText: { fontWeight: '800', color: colors.white },
 });

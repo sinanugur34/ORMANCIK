@@ -55,15 +55,16 @@
       "expo-font",
       "expo-localization",
       [
-        "expo-av",
+        "expo-audio",
         {
-          "microphonePermission": false
+          "microphonePermission": false,
+          "recordAudioAndroid": false
         }
       ]
     ],
     "extra": {
       "ageMin": 3,
-      "ageMax": 10,
+      "ageMax": 9,
       "privacyPolicyUrl": "https://ormancik.app/privacy",
       "supportEmail": "privacy@ormancik.app"
     }

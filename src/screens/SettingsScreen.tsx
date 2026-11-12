@@ -6,7 +6,11 @@ import { AnimatedBackground } from '../components/AnimatedBackground';
 import { BouncePress, FadeInView } from '../components/Motion';
 import { ParentalGate } from '../components/ParentalGate';
 import { PrimaryButton } from '../components/PrimaryButton';
+import { speakKidPrompt } from '../audio/speakPrompt';
 import { StatusBanner } from '../components/StatusBanner';
+import { HOME_TASKS } from '../data/homeTasks';
+import { albumWord } from '../data/friendsUnit';
+import { familyStatus, practiceDay, practiceNoteFromStat, practiceResult, type LearningNote, type PracticeDay } from '../data/learning';
 import type { Language } from '../i18n';
 import { useT } from '../i18n';
 import { isDeviceTurkish } from '../i18n/deviceLocale';
@@ -18,7 +22,7 @@ import { colors } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Settings'>;
 
-const AGES = [3, 4, 5, 6, 7, 8, 9, 10];
+const AGES = [3, 4, 5, 6, 7, 8, 9];
 
 type GateKind =
   | { type: 'age' }
@@ -26,6 +30,9 @@ type GateKind =
   | { type: 'reset' }
   | { type: 'add' }
   | { type: 'delete'; id: string }
+  | { type: 'replay' }
+  | { type: 'keepReplay' }
+  | { type: 'homeTask'; id: string }
   | null;
 
 export function SettingsScreen({ navigation }: Props) {
@@ -46,6 +53,20 @@ export function SettingsScreen({ navigation }: Props) {
     setLanguage,
     resetProgress,
     ownCosmetic,
+    hintsEnabled,
+    setHintsEnabled,
+    englishLevel,
+    setEnglishLevel,
+    sessionLimit,
+    setSessionLimit,
+    saveIssue,
+    wordProgress,
+    replayOffer,
+    acceptReplay,
+    declineReplay,
+    homeTasks,
+    markHomeTask,
+    recentLearning,
   } = useGame();
   const [ageDraft, setAgeDraft] = useState(childAge ?? 5);
   const [gate, setGate] = useState<GateKind>(null);
@@ -85,6 +106,23 @@ export function SettingsScreen({ navigation }: Props) {
       return;
     }
 
+    if (kind.type === 'replay') {
+      acceptReplay();
+      setBanner({ message: t('settings.replayYes'), tone: 'ok' });
+      return;
+    }
+
+    if (kind.type === 'keepReplay') {
+      declineReplay();
+      setBanner({ message: t('settings.replayNo'), tone: 'info' });
+      return;
+    }
+
+    if (kind.type === 'homeTask') {
+      markHomeTask(kind.id);
+      return;
+    }
+
     if (kind.type === 'reset') {
       resetProgress();
       setBanner({ message: t('settings.resetDone'), tone: 'info' });
@@ -98,7 +136,7 @@ export function SettingsScreen({ navigation }: Props) {
 
     setBusy(true);
     try {
-      const res = await restorePurchases();
+      const res = await restorePurchases(premium);
       if (res.premium) {
         setPremium(true);
         const { COSMETICS } = await import('../data/cosmetics');
@@ -128,7 +166,13 @@ export function SettingsScreen({ navigation }: Props) {
           ? t('settings.gateAdd')
           : gate?.type === 'delete'
             ? t('settings.gateDelete')
-            : t('settings.gateReset');
+            : gate?.type === 'replay'
+              ? t('settings.gateReplay')
+              : gate?.type === 'keepReplay'
+                ? t('settings.gateKeep')
+                : gate?.type === 'homeTask'
+                  ? t('settings.gateHome')
+                  : t('settings.gateReset');
 
   const pendingSwitch = profiles.find((p) => p.id === switchConfirmId) ?? null;
   const pendingDelete = profiles.find((p) => p.id === deleteConfirmId) ?? null;
@@ -155,6 +199,70 @@ export function SettingsScreen({ navigation }: Props) {
     if (lang === language) return;
     setLanguage(lang);
   };
+
+  const statusKeyFor = (status: ReturnType<typeof familyStatus>) =>
+    status === 'recalled'
+      ? 'settings.statusRecalled'
+      : status === 'solo'
+        ? 'settings.statusSolo'
+        : status === 'seen'
+          ? 'settings.statusSeen'
+          : status === 'helped'
+            ? 'settings.statusHelped'
+            : 'settings.statusMet';
+
+  const wordName = (id: string) => {
+    const word = albumWord(id);
+    if (!word) return null;
+    return language === 'tr' ? `${word.en} · ${word.tr}` : word.en;
+  };
+
+  const practiceNotes: LearningNote[] = recentLearning.length
+    ? recentLearning
+    : Object.values(wordProgress)
+        .filter((stat) => stat.attempts > 0 && stat.lastAt > 0 && stat.skill !== 'count-quantity' && !stat.id.startsWith('room.'))
+        .map(practiceNoteFromStat);
+
+  const practiceRows = practiceNotes
+    .slice()
+    .sort((a, b) => b.at - a.at)
+    .flatMap((note) => {
+      const name = wordName(note.id);
+      if (!name) return [];
+      const day = practiceDay(note.at);
+      const result = practiceResult(note);
+      const statusKey =
+        result === 'tried'
+          ? 'settings.statusTried'
+          : result === 'unfinished'
+            ? 'settings.statusUnfinished'
+            : result === 'seen'
+              ? 'settings.statusSeen'
+              : result === 'helped-seen'
+                ? 'settings.statusHelpedSeen'
+                : result === 'solo'
+                  ? 'settings.statusSolo'
+                  : 'settings.statusHelped';
+      return [{ id: note.eventId, name, statusKey, day } as const];
+    })
+    .slice(0, 6);
+
+  const practiceGroups = (['today', 'yesterday', 'earlier'] as PracticeDay[])
+    .map((day) => ({
+      day,
+      rows: practiceRows.filter((row) => row.day === day),
+    }))
+    .filter((group) => group.rows.length > 0);
+
+  const familyRows = Object.values(wordProgress)
+    .filter((stat) => stat.attempts > 0 && stat.skill !== 'count-quantity' && !stat.id.startsWith('room.'))
+    .sort((a, b) => b.lastAt - a.lastAt)
+    .slice(0, 6)
+    .flatMap((stat) => {
+      const name = wordName(stat.id);
+      if (!name) return [];
+      return [{ id: stat.id, name, statusKey: statusKeyFor(familyStatus(stat)) } as const];
+    });
 
   return (
     <AnimatedBackground variant="forest">
@@ -244,9 +352,126 @@ export function SettingsScreen({ navigation }: Props) {
             />
           </FadeInView>
 
+          {saveIssue === 'read' ? <StatusBanner message={t('settings.saveWarning')} tone="warn" /> : null}
+          {saveIssue === 'write' ? <StatusBanner message={t('settings.saveWriteWarning')} tone="warn" /> : null}
+
+          <FadeInView delay={60} style={styles.card}>
+            <Text style={styles.h}>{t('settings.learning')}</Text>
+            <Text style={styles.sub}>{t('settings.hints')}</Text>
+            <BouncePress
+              onPress={() => setHintsEnabled(!hintsEnabled)}
+              style={[styles.toggleRow, hintsEnabled ? styles.toggleOn : styles.toggleOff]}
+            >
+              <Text style={[styles.toggleLabel, hintsEnabled && styles.toggleLabelOn]}>
+                {hintsEnabled ? t('common.on') : t('common.off')}
+              </Text>
+            </BouncePress>
+            <View style={styles.langRow}>
+              {(['new', 'some', 'ready'] as const).map((level) => (
+                <BouncePress
+                  key={level}
+                  onPress={() => setEnglishLevel(level)}
+                  style={[styles.langBtn, englishLevel === level && styles.langBtnOn]}
+                >
+                  <Text style={[styles.langText, englishLevel === level && styles.langTextOn]}>
+                    {t(level === 'new' ? 'settings.levelNew' : level === 'some' ? 'settings.levelSome' : 'settings.levelReady')}
+                  </Text>
+                </BouncePress>
+              ))}
+            </View>
+            <Text style={styles.sub}>
+              {t(
+                englishLevel === 'new'
+                  ? 'settings.levelNewHelp'
+                  : englishLevel === 'some'
+                    ? 'settings.levelSomeHelp'
+                    : 'settings.levelReadyHelp',
+              )}
+            </Text>
+            <PrimaryButton
+              label={sessionLimit === 0 ? t('settings.sessionOff') : t('settings.session', { n: sessionLimit })}
+              large={false}
+              tone="sky"
+              onPress={() => setSessionLimit(sessionLimit >= 12 ? 0 : sessionLimit + 4)}
+              style={{ marginTop: 12 }}
+            />
+          </FadeInView>
+
+          <FadeInView delay={70} style={styles.card}>
+            <Text style={styles.h}>{t('settings.familyTitle')}</Text>
+            {practiceGroups.length === 0 ? <Text style={styles.sub}>{t('settings.familyEmpty')}</Text> : null}
+            {practiceGroups.map((group) => (
+              <View key={group.day}>
+                <Text style={styles.sub}>
+                  {t(group.day === 'today' ? 'settings.dayToday' : group.day === 'yesterday' ? 'settings.dayYesterday' : 'settings.dayEarlier')}
+                </Text>
+                {group.rows.map((row) => (
+                  <Text key={row.id} style={styles.sub}>
+                    {row.name} · {t(row.statusKey)}
+                  </Text>
+                ))}
+              </View>
+            ))}
+            {familyRows.length > 0 ? (
+              <View style={{ marginTop: 12 }}>
+                <Text style={styles.h}>{t('settings.statusTitle')}</Text>
+                {familyRows.map((row) => (
+                  <Text key={row.id} style={styles.sub}>
+                    {row.name} · {t(row.statusKey)}
+                  </Text>
+                ))}
+              </View>
+            ) : null}
+            {replayOffer ? (
+              <View style={{ marginTop: 12 }}>
+                <Text style={styles.h}>{t('settings.replayTitle')}</Text>
+                <Text style={styles.sub}>{t('settings.replayBody')}</Text>
+                <PrimaryButton
+                  label={t('settings.replayYes')}
+                  onPress={() => setGate({ type: 'replay' })}
+                  style={{ marginTop: 8 }}
+                />
+                <PrimaryButton
+                  label={t('settings.replayNo')}
+                  tone="sky"
+                  large={false}
+                  onPress={() => setGate({ type: 'keepReplay' })}
+                  style={{ marginTop: 8 }}
+                />
+              </View>
+            ) : null}
+            <Text style={[styles.h, { marginTop: 16 }]}>{t('homeTask.title')}</Text>
+            <Text style={styles.sub}>{t('homeTask.body')}</Text>
+            {HOME_TASKS.map((task) => {
+              const done = homeTasks.includes(task.id);
+              return (
+                <View key={task.id} style={{ marginTop: 10 }}>
+                  <Text style={styles.sub}>{t(task.label)}</Text>
+                  <View style={styles.langRow}>
+                    <PrimaryButton
+                      label={t('album.listen')}
+                      large={false}
+                      tone="sky"
+                      onPress={() => {
+                        void speakKidPrompt(task.say, { lang: 'en', clipId: task.clipId });
+                      }}
+                    />
+                    <PrimaryButton
+                      label={done ? t('homeTask.done') : t('homeTask.mark')}
+                      large={false}
+                      disabled={done}
+                      onPress={() => setGate({ type: 'homeTask', id: task.id })}
+                    />
+                  </View>
+                </View>
+              );
+            })}
+          </FadeInView>
+
           <FadeInView delay={80} style={styles.card}>
             <Text style={styles.h}>{t('settings.voice')}</Text>
             <Text style={styles.sub}>{t('settings.voiceSub')}</Text>
+            <Text style={styles.sub}>{t('settings.voicePack')}</Text>
             <BouncePress
               onPress={() => setVoiceEnabled(!voiceEnabled)}
               style={[styles.toggleRow, voiceEnabled ? styles.toggleOn : styles.toggleOff]}
@@ -473,7 +698,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  deleteText: { fontWeight: '800', color: colors.coral, fontSize: 13 },
+  deleteText: { fontWeight: '800', color: colors.coralInk, fontSize: 13 },
   toggleRow: {
     marginTop: 14,
     minHeight: 52,
@@ -533,6 +758,6 @@ const styles = StyleSheet.create({
   confirmGhost: { backgroundColor: 'rgba(15,61,46,0.08)' },
   confirmGhostText: { fontWeight: '700', color: colors.forestDeep },
   confirmPrimary: { backgroundColor: colors.forest },
-  confirmDanger: { backgroundColor: colors.coral },
+  confirmDanger: { backgroundColor: colors.coralStrong },
   confirmPrimaryText: { fontWeight: '800', color: colors.white },
 });

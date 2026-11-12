@@ -25,7 +25,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ProfileSetup'>;
 const BAND_IDS = [
   { id: '3-5' as const, ages: [3, 4, 5] },
   { id: '6-8' as const, ages: [6, 7, 8] },
-  { id: '9-10' as const, ages: [9, 10] },
+  { id: '9-10' as const, ages: [9] },
 ];
 
 export function ProfileSetupScreen({ navigation, route }: Props) {
@@ -282,7 +282,7 @@ const styles = StyleSheet.create({
   ageText: { fontSize: 22, fontWeight: '800', color: colors.forestDeep },
   ageTextOn: { color: colors.white },
   warn: {
-    color: colors.coral,
+    color: colors.coralInk,
     fontWeight: '700',
     marginBottom: 8,
     textAlign: 'center',

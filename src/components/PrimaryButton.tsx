@@ -5,7 +5,7 @@ import { colors } from '../theme/colors';
 type Props = {
   label: string;
   onPress: () => void;
-  tone?: 'primary' | 'sun' | 'coral' | 'sky';
+  tone?: 'primary' | 'sun' | 'coral' | 'sky' | 'quiet';
   style?: ViewStyle;
   disabled?: boolean;
   /** Larger kid-friendly CTA (default true for primary actions). */
@@ -15,8 +15,9 @@ type Props = {
 const tones = {
   primary: colors.forest,
   sun: colors.sun,
-  coral: colors.coral,
+  coral: colors.coralStrong,
   sky: colors.sky,
+  quiet: colors.white,
 };
 
 const labelColors = {
@@ -24,6 +25,7 @@ const labelColors = {
   sun: colors.forestDeep,
   coral: colors.white,
   sky: colors.forestDeep,
+  quiet: colors.forestDeep,
 };
 
 export function PrimaryButton({
@@ -42,6 +44,7 @@ export function PrimaryButton({
       style={({ pressed }) => [
         styles.btn,
         large ? styles.btnLarge : styles.btnCompact,
+        tone === 'quiet' && styles.quiet,
         {
           backgroundColor: tones[tone],
           opacity: disabled ? 0.45 : pressed ? 0.88 : 1,
@@ -80,7 +83,11 @@ const styles = StyleSheet.create({
     fontSize: 17,
   },
   labelLarge: {
-    fontSize: 20,
+    fontSize: 22,
     letterSpacing: 0.2,
+  },
+  quiet: {
+    borderWidth: 2,
+    borderColor: 'rgba(15,61,46,0.18)',
   },
 });

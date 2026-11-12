@@ -1,7 +1,7 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
 import React, { useMemo, useState } from 'react';
-import { Modal, StyleSheet, Text, View } from 'react-native';
+import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   FadeIn,
   ZoomIn,
@@ -15,9 +15,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { speakKidPrompt } from '../audio/speakPrompt';
 import { AnimatedBackground } from '../components/AnimatedBackground';
 import { LevelPlay } from '../components/LevelPlay';
-import { BouncePress, FadeInView } from '../components/Motion';
+import { BouncePress } from '../components/Motion';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SparkleBurst } from '../components/SparkleBurst';
+import { knownWordIds } from '../data/learning';
+import { lessonVisit } from '../data/lessonVisit';
 import { displayIslandName, islandForLevel } from '../data/islands';
 import { buildLevel } from '../data/levels';
 import { useT } from '../i18n';
@@ -26,6 +28,49 @@ import { useGame } from '../store/GameContext';
 import { colors } from '../theme/colors';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Level'>;
+
+const FRIEND_STEPS = [
+  { emoji: '🐱', say: 'Call the cat.', label: 'level.friendsStepCat' },
+  { emoji: '🐶', say: 'The cat is here. Call the dog.', label: 'level.friendsStepDog' },
+  { emoji: '🐰', say: 'The dog is here. Call the rabbit.', label: 'level.friendsStepRabbit' },
+] as const;
+
+function FriendsFinale() {
+  const t = useT();
+  const [called, setCalled] = useState(0);
+  const together = called >= FRIEND_STEPS.length;
+
+  React.useEffect(() => {
+    const line = together
+      ? 'The cat, the dog, and the rabbit are together.'
+      : FRIEND_STEPS[called]?.say;
+    if (!line) return;
+    void speakKidPrompt(line, { lang: 'en' });
+  }, [called, together]);
+
+  return (
+    <View style={styles.finale}>
+      <View style={styles.rug}>
+        {FRIEND_STEPS.slice(0, called).map((friend) => (
+          <Text key={friend.emoji} style={styles.friend}>
+            {friend.emoji}
+          </Text>
+        ))}
+      </View>
+      {together ? (
+        <Text style={styles.modalSub}>{t('level.friendsTogether')}</Text>
+      ) : (
+        <BouncePress
+          onPress={() => setCalled((n) => Math.min(FRIEND_STEPS.length, n + 1))}
+          style={styles.callFriend}
+        >
+          <Text style={styles.friend}>{FRIEND_STEPS[called]?.emoji}</Text>
+          <Text style={styles.callLabel}>{t(FRIEND_STEPS[called]!.label)}</Text>
+        </BouncePress>
+      )}
+    </View>
+  );
+}
 
 function StarRow({ stars }: { stars: 1 | 2 | 3 }) {
   return (
@@ -46,13 +91,33 @@ function StarRow({ stars }: { stars: 1 | 2 | 3 }) {
 export function LevelScreen({ navigation, route }: Props) {
   const t = useT();
   const { levelId } = route.params;
-  const { ageBand, clearLevel, isLevelUnlocked, language } = useGame();
+  const {
+    ageBand,
+    clearLevel,
+    hintsEnabled,
+    isLevelUnlocked,
+    language,
+    recordLearning,
+    englishLevel,
+    wordProgress,
+    sessionLimit,
+    sittingCount,
+    dismissSitting,
+  } = useGame();
   const band = ageBand ?? '3-5';
-  const level = useMemo(() => buildLevel(levelId, band, language), [levelId, band, language]);
+  const [visit] = useState(() =>
+    lessonVisit(null, `${levelId}:${band}:${language}:${englishLevel}`, knownWordIds(wordProgress)),
+  );
+  const level = useMemo(
+    () => buildLevel(levelId, band, language, { englishLevel, knownIds: visit.knownIds }),
+    [levelId, band, language, englishLevel, visit],
+  );
   const island = islandForLevel(levelId);
   const islandLabel = displayIslandName(island);
   const [won, setWon] = useState(false);
+  const [breakAsk, setBreakAsk] = useState(false);
   const [stars, setStars] = useState<1 | 2 | 3>(3);
+  const [awarded, setAwarded] = useState(level.reward);
   const pulse = useSharedValue(1);
 
   React.useEffect(() => {
@@ -62,8 +127,9 @@ export function LevelScreen({ navigation, route }: Props) {
       -1,
       true,
     );
+    if (levelId === 8) return;
     void speakKidPrompt(t('level.bravo'));
-  }, [won, pulse, t]);
+  }, [won, pulse, t, levelId]);
 
   const devamStyle = useAnimatedStyle(() => ({ transform: [{ scale: pulse.value }] }));
 
@@ -79,7 +145,7 @@ export function LevelScreen({ navigation, route }: Props) {
   }
 
   return (
-    <AnimatedBackground variant="sunset">
+    <AnimatedBackground variant="sunset" calm>
       <SafeAreaView style={{ flex: 1 }}>
         <View style={styles.header}>
           <BouncePress onPress={() => navigation.goBack()} style={styles.back}>
@@ -93,39 +159,62 @@ export function LevelScreen({ navigation, route }: Props) {
           </View>
         </View>
 
-        <FadeInView style={styles.card}>
+        <ScrollView
+          style={styles.scroll}
+          contentContainerStyle={styles.cardWrap}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View style={styles.card}>
           <LevelPlay
             level={level}
             band={band}
-            onWin={(earned) => {
-              clearLevel(levelId, level.reward);
-              setStars(earned);
+            hintsEnabled={hintsEnabled}
+            wordProgress={wordProgress}
+            onWin={(result) => {
+              const coins = clearLevel(levelId, level.reward, result.stars);
+              recordLearning(result.words);
+              setAwarded(coins);
+              setStars(result.stars);
               setWon(true);
             }}
           />
-        </FadeInView>
+          </View>
+        </ScrollView>
       </SafeAreaView>
 
       <Modal visible={won} transparent animationType="fade">
         <View style={styles.modalBg}>
           <Animated.View entering={ZoomIn.springify()} style={styles.modalCard}>
-            <LinearGradient colors={[island.accent, colors.forest]} style={styles.modalHero}>
+            <LinearGradient colors={[colors.forest, colors.forestDeep]} style={styles.modalHero}>
               <SparkleBurst active={won} tone="good" count={16} />
               <Animated.Text entering={FadeIn.delay(80)} style={styles.modalTitle}>
                 {t('level.bravo')}
               </Animated.Text>
               <Text style={styles.modalSub}>
-                {t('level.rewardSub', { island: islandLabel, reward: level.reward })}
+                {t('level.rewardSub', { island: islandLabel, reward: awarded })}
               </Text>
+              {levelId === 8 ? <FriendsFinale /> : null}
               <StarRow stars={stars} />
             </LinearGradient>
             <View style={styles.modalActions}>
+              {breakAsk ? (
+                <View style={{ marginBottom: 8 }}>
+                  <Text style={styles.breakTitle}>{t('home.breakTitle')}</Text>
+                  <Text style={styles.breakBody}>{t('home.breakBody')}</Text>
+                </View>
+              ) : null}
               {levelId < 80 ? (
                 <Animated.View style={devamStyle}>
                   <PrimaryButton
-                    label={t('level.continue')}
+                    label={breakAsk ? t('home.breakContinue') : t('level.continue')}
                     tone="sun"
                     onPress={() => {
+                      if (!breakAsk && sessionLimit > 0 && sittingCount >= sessionLimit) {
+                        setBreakAsk(true);
+                        return;
+                      }
+                      if (breakAsk) dismissSitting();
+                      setBreakAsk(false);
                       setWon(false);
                       navigation.replace('Level', { levelId: levelId + 1 });
                     }}
@@ -137,8 +226,10 @@ export function LevelScreen({ navigation, route }: Props) {
                 large={false}
                 style={{ marginTop: 12 }}
                 onPress={() => {
-                  setWon(false);
-                  navigation.navigate('Map');
+                  navigation.reset({
+                    index: 1,
+                    routes: [{ name: 'Home' }, { name: 'Map' }],
+                  });
                 }}
               />
             </View>
@@ -171,12 +262,15 @@ const styles = StyleSheet.create({
   backText: { fontSize: 16, fontWeight: '800', color: colors.forestDeep },
   island: { fontWeight: '700', color: colors.muted },
   title: { fontSize: 20, fontWeight: '900', color: colors.forestDeep },
+  scroll: { flex: 1 },
+  cardWrap: { padding: 16, alignItems: 'center' },
   card: {
-    margin: 16,
+    width: '100%',
+    maxWidth: 680,
     backgroundColor: colors.card,
     borderRadius: 28,
     padding: 16,
-    flexGrow: 1,
+    paddingBottom: 28,
   },
   modalBg: {
     flex: 1,
@@ -200,7 +294,22 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   modalTitle: { marginTop: 4, fontSize: 34, fontWeight: '900', color: colors.white },
-  modalSub: { marginTop: 6, color: 'rgba(255,255,255,0.92)', fontWeight: '700', fontSize: 16 },
+  modalSub: { marginTop: 6, color: 'rgba(255,255,255,0.92)', fontWeight: '700', fontSize: 16, textAlign: 'center' },
+  finale: { alignItems: 'center', marginTop: 10 },
+  rug: {
+    minHeight: 54,
+    minWidth: 180,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 12,
+  },
+  friend: { fontSize: 32 },
+  callFriend: { marginTop: 8, alignItems: 'center' },
+  callLabel: { color: colors.white, fontWeight: '800', marginTop: 2 },
   starRow: { flexDirection: 'row', gap: 10, marginTop: 18 },
   star: {
     width: 44,
@@ -213,4 +322,6 @@ const styles = StyleSheet.create({
   starOff: { backgroundColor: 'rgba(255,255,255,0.25)' },
   starGlyph: { fontSize: 22, color: colors.forestDeep, fontWeight: '900' },
   modalActions: { padding: 20 },
+  breakTitle: { fontSize: 20, fontWeight: '900', color: colors.forestDeep, textAlign: 'center' },
+  breakBody: { marginTop: 4, color: colors.muted, fontWeight: '700', textAlign: 'center' },
 });

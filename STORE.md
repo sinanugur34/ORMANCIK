@@ -117,18 +117,18 @@ Package / applicationId stays **`com.ormancik.kids`**. EN listing may optionally
 
 **Short description TR (≤80 chars):**
 ```
-3–10 yaş renkli orman macerası: 80 bölüm, kostümler, ebeveyn korumalı.
+3–9 yaş renkli orman macerası: 80 bölüm, kostümler, ebeveyn korumalı.
 ```
 
 **EN short (sketch):**
 ```
-Woodlet — ages 3–10 forest adventure (Ormancık). 80 levels, costumes, parental gates.
+Woodlet — ages 3–9 forest adventure (Ormancık). 80 levels, costumes, parental gates.
 ```
 
 **Full description (TR)** — paste from below; add EN translation in Play Console locale (EN title Woodlet).
 
 ```
-Ormancık, 3–10 yaş çocuklar için güvenli, renkli bir orman macerası.
+Ormancık, 3–9 yaş çocuklar için güvenli, renkli bir orman macerası.
 
 • 80 prosedürel bölüm (renk, şekil, sıra, hafıza, sayma)
 • Yaşa göre zorluk (ebeveyn yaş seçer)

@@ -13,8 +13,11 @@ import { PlayRoomScreen } from './src/screens/PlayRoomScreen';
 import { PremiumScreen } from './src/screens/PremiumScreen';
 import { PrivacyScreen } from './src/screens/PrivacyScreen';
 import { ProfileSetupScreen } from './src/screens/ProfileSetupScreen';
+import { ReviewScreen } from './src/screens/ReviewScreen';
+import { SaveRecoveryScreen } from './src/screens/SaveRecoveryScreen';
 import { SettingsScreen } from './src/screens/SettingsScreen';
 import { ShopScreen } from './src/screens/ShopScreen';
+import { WordAlbumScreen } from './src/screens/WordAlbumScreen';
 import { useLanguage, useT } from './src/i18n';
 import { GameProvider, useGame } from './src/store/GameContext';
 import { colors } from './src/theme/colors';
@@ -34,7 +37,7 @@ const navTheme = {
 };
 
 function RootNav() {
-  const { ready, activeProfile, languageChosen } = useGame();
+  const { ready, activeProfile, languageChosen, saveBlocked } = useGame();
   const t = useT();
 
   if (!ready) {
@@ -71,6 +74,8 @@ function RootNav() {
     );
   }
 
+  if (saveBlocked) return <SaveRecoveryScreen />;
+
   const initialRouteName = !languageChosen
     ? 'LanguageGate'
     : activeProfile == null
@@ -90,12 +95,19 @@ function RootNav() {
       <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="Map" component={MapScreen} options={{ animation: 'slide_from_right' }} />
-      <Stack.Screen name="Level" component={LevelScreen} options={{ animation: 'fade' }} />
+      <Stack.Screen
+        name="Level"
+        component={LevelScreen}
+        getId={({ params }) => String(params.levelId)}
+        options={{ animation: 'fade' }}
+      />
       <Stack.Screen name="PlayRoom" component={PlayRoomScreen} options={{ animation: 'fade' }} />
       <Stack.Screen name="Shop" component={ShopScreen} options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="Premium" component={PremiumScreen} options={{ animation: 'fade' }} />
       <Stack.Screen name="Settings" component={SettingsScreen} options={{ animation: 'slide_from_right' }} />
       <Stack.Screen name="Privacy" component={PrivacyScreen} options={{ animation: 'fade' }} />
+      <Stack.Screen name="WordAlbum" component={WordAlbumScreen} options={{ animation: 'slide_from_right' }} />
+      <Stack.Screen name="Review" component={ReviewScreen} options={{ animation: 'fade' }} />
     </Stack.Navigator>
   );
 }

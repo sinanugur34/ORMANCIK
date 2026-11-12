@@ -17,9 +17,10 @@ type Props = {
   outfitEmoji?: string;
   petEmoji?: string;
   fxEmoji?: string | null;
+  hatEmoji?: string;
 };
 
-export function GroveMascot({ size = 160, outfitEmoji, petEmoji, fxEmoji }: Props) {
+export function GroveMascot({ size = 160, outfitEmoji, petEmoji, fxEmoji, hatEmoji }: Props) {
   const bob = useSharedValue(0);
   const sway = useSharedValue(0);
 
@@ -50,10 +51,11 @@ export function GroveMascot({ size = 160, outfitEmoji, petEmoji, fxEmoji }: Prop
   }));
 
   return (
-    <View style={{ width: size + 40, height: size + 40, alignItems: 'center', justifyContent: 'center' }}>
+    <View pointerEvents="none" style={{ width: size + 40, height: size + 40, alignItems: 'center', justifyContent: 'center' }}>
       {fxEmoji ? <Animated.Text style={[styles.fx, { fontSize: size * 0.22 }]}>{fxEmoji}</Animated.Text> : null}
       <Animated.View style={body}>
-        <Image source={mascot} style={{ width: size, height: size, borderRadius: size * 0.28 }} />
+        <Image source={mascot} style={{ width: size, height: size, borderRadius: size / 2 }} />
+        {hatEmoji ? <Animated.Text style={[styles.hat, { fontSize: size * 0.34 }]}>{hatEmoji}</Animated.Text> : null}
         {outfitEmoji ? <Animated.Text style={[styles.outfit, { fontSize: size * 0.28 }]}>{outfitEmoji}</Animated.Text> : null}
       </Animated.View>
       {petEmoji ? <Animated.Text style={[styles.pet, { fontSize: size * 0.32 }]}>{petEmoji}</Animated.Text> : null}
@@ -62,6 +64,7 @@ export function GroveMascot({ size = 160, outfitEmoji, petEmoji, fxEmoji }: Prop
 }
 
 const styles = StyleSheet.create({
+  hat: { position: 'absolute', top: -18, left: 0, right: 0, textAlign: 'center' },
   outfit: { position: 'absolute', top: -6, right: -4 },
   pet: { position: 'absolute', bottom: 0, left: 0 },
   fx: { position: 'absolute', top: 8, left: 8, opacity: 0.9 },

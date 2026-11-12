@@ -1,5 +1,6 @@
 import { getLanguage, tFor, type Language } from '../i18n';
 import { AgeBand, palette } from '../theme/colors';
+import { buildFriendsLevel, type FriendsLearning, type LessonStep } from './friendsUnit';
 import { islandForLevel, TOTAL_LEVELS } from './islands';
 
 export type LevelTemplate =
@@ -14,7 +15,10 @@ export type LevelTemplate =
   | 'oddOneOut'
   | 'animalMatch'
   | 'pathOrder'
-  | 'quickFind';
+  | 'quickFind'
+  | 'lesson';
+
+export type { LessonStep };
 
 export type ShapeToken = {
   glyph: string;
@@ -56,6 +60,8 @@ export type LevelDef = {
   pathLength?: number;
   /** quickFind: denser grid size */
   findGridSize?: number;
+  /** Scripted English lesson. When set, play uses the listen → find → transfer cycle. */
+  lesson?: LessonStep[];
 };
 
 const SHAPE_DEFS: { glyph: string; labelKey: string }[] = [
@@ -165,7 +171,8 @@ function bandTuning(band: AgeBand, levelId: number): Tuning {
     return {
       optionCount: 3 + (wave >= 3 ? 1 : 0) + (wave >= 6 ? 1 : 0),
       targetCount: 2 + (wave >= 2 ? 1 : 0) + (within > 7 && wave >= 4 ? 1 : 0),
-      timerSec: wave >= 5 ? 48 - Math.min(wave, 6) : undefined,
+      // Learning play has no countdown. A separate challenge mode can add one later.
+      timerSec: undefined,
       allowMemory: wave >= 1,
       allowSequence: true,
       allowPattern: true,
@@ -178,7 +185,7 @@ function bandTuning(band: AgeBand, levelId: number): Tuning {
   return {
     optionCount: 4 + (wave >= 2 ? 1 : 0) + (wave >= 5 ? 1 : 0),
     targetCount: 3 + (wave >= 3 ? 1 : 0),
-    timerSec: Math.max(28, 42 - Math.min(wave, 5) * 2),
+    timerSec: undefined,
     allowMemory: true,
     allowSequence: true,
     allowPattern: true,
@@ -198,7 +205,7 @@ function templateFor(levelId: number, band: AgeBand, rng: () => number, tuning: 
     if (tuning.allowSequence) pool.push('sequence');
   } else if (band === '6-8') {
     pool = [...MID_TEMPLATES];
-    if (!tuning.allowMemory) pool = pool.filter((t) => t !== 'memory');
+    if (tuning.allowMemory) pool.push('memory');
     if (tuning.allowQuickFind) pool.push('quickFind');
   } else {
     pool = [...ALL_TEMPLATES];
@@ -240,7 +247,7 @@ function templateFor(levelId: number, band: AgeBand, rng: () => number, tuning: 
     pool = pool.filter((t) =>
       ['colorMatch', 'shapeSort', 'countCollect', 'sizeCompare', 'oddOneOut', 'animalMatch'].includes(t),
     );
-  } else if (levelId <= 12) {
+  } else if (levelId <= 12 && !(band === '6-8' && tuning.allowMemory)) {
     pool = pool.filter((t) => t !== 'memory');
   }
 
@@ -303,9 +310,9 @@ function promptFor(
     case 'oddOneOut':
       return soft ? p('level.prompt.oddOneOut.soft') : p('level.prompt.oddOneOut', { place });
     case 'animalMatch':
-      return soft
-        ? p('level.prompt.animalMatch.soft')
-        : p('level.prompt.animalMatch', { place });
+      return `Find the ${extras.targetLabel ?? 'friend'}.`;
+    case 'lesson':
+      return extras.targetLabel || p('level.prompt.default', { place });
     case 'pathOrder':
       return soft
         ? p('level.prompt.pathOrder.soft')
@@ -319,7 +326,15 @@ function promptFor(
   }
 }
 
-export function buildLevel(levelId: number, band: AgeBand, lang: Language = getLanguage()): LevelDef {
+export function buildLevel(
+  levelId: number,
+  band: AgeBand,
+  lang: Language = getLanguage(),
+  learning?: FriendsLearning,
+): LevelDef {
+  const scripted = buildFriendsLevel(levelId, band, lang, learning);
+  if (scripted) return scripted;
+
   const rng = mulberry32(levelId * 997 + band.charCodeAt(0) * 13);
   const island = islandForLevel(levelId);
   const tuning = bandTuning(band, levelId);
@@ -375,15 +390,12 @@ export function buildLevel(levelId: number, band: AgeBand, lang: Language = getL
   if (template === 'quickFind') {
     if (band === '9-10') {
       findGridSize = levelId <= 4 ? 6 : Math.min(8, 6 + Math.floor((levelId - 1) / 10));
-      // Light pressure: short timer even early for 9–10
-      timerSec = timerSec ?? Math.max(18, 28 - Math.min(Math.floor((levelId - 1) / 10), 4) * 2);
     } else if (band === '6-8') {
       findGridSize = 6;
-      timerSec = timerSec ?? 36;
     } else {
       findGridSize = 4;
-      timerSec = undefined;
     }
+    timerSec = undefined;
   }
 
   const islandLabel = tFor(lang, `island.${island.id}`);
@@ -408,7 +420,10 @@ export function buildLevel(levelId: number, band: AgeBand, lang: Language = getL
     findGridSize,
     prompt: promptFor(template, island.id, band, lang, {
       findBigger,
-      targetLabel: shapeTokens[0]?.label,
+      targetLabel:
+        template === 'animalMatch'
+          ? tFor('en', animals[0]?.labelKey ?? 'animal.cat').toLowerCase()
+          : shapeTokens[0]?.label,
       need: targetCount,
     }),
   };

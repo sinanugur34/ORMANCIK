@@ -39,10 +39,13 @@ export async function purchasePremium(): Promise<PurchaseResult> {
   };
 }
 
-export async function restorePurchases(): Promise<{ premium: boolean; mock: boolean }> {
+export async function restorePurchases(
+  savedPremium = false,
+): Promise<{ premium: boolean; mock: boolean }> {
   if (!USE_MOCK_MONETIZATION) {
     return { premium: false, mock: false };
   }
   await new Promise((r) => setTimeout(r, 400));
-  return { premium: false, mock: true };
+  // Demo has no store receipt. The only entitlement we can restore is the one saved on this device.
+  return { premium: savedPremium, mock: true };
 }

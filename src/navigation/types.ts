@@ -9,4 +9,6 @@ export type RootStackParamList = {
   Premium: undefined;
   Settings: undefined;
   Privacy: undefined;
+  WordAlbum: undefined;
+  Review: { wordIds?: string[] } | undefined;
 };

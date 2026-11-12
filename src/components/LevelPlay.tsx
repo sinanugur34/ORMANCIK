@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   FadeIn,
   ZoomIn,
@@ -8,17 +8,40 @@ import Animated, {
   withSequence,
   withSpring,
 } from 'react-native-reanimated';
-import { speakKidPrompt, speakPraise, stopSpeaking } from '../audio/speakPrompt';
-import { useT } from '../i18n';
+import { isVoiceNarrationEnabled, promptHasStarted, resetPromptAudible, speakKidPrompt, speakPraise, stopSpeaking, type SpeakOutcome } from '../audio/speakPrompt';
+import { animalRoundsFor, colorRoundsFor, shapeRoundsFor } from '../data/activityRounds';
+import { buildRounds, playSeed, seededShuffle, shapePixelSize } from '../data/rounds';
+import { tFor, useT } from '../i18n';
+import { skillAfterPrompt, type LearningSkill, type WordAttempt, type WordStat } from '../data/learning';
 import { LevelDef, starsFromMistakes } from '../data/levels';
 import { AgeBand, colors } from '../theme/colors';
+import { colorId, colorName } from '../theme/colorNames';
+import { LessonPlay } from './LessonPlay';
+import { ListenBar } from './ListenBar';
+import type { LevelWin } from './levelWin';
 import { BouncePress } from './Motion';
 import { SparkleBurst } from './SparkleBurst';
+
+const ENGLISH_TEMPLATES = new Set([
+  'animalMatch',
+  'colorMatch',
+  'shapeSort',
+  'countCollect',
+  'sizeCompare',
+  'sequence',
+]);
+
+const COUNT_WORDS = ['', 'one', 'two', 'three', 'four', 'five'];
+const COUNT_TR = ['', 'bir', 'iki', 'üç', 'dört', 'beş'];
+const COUNT_EMOJI = ['🍎', '🌟', '🍃', '🌸'];
+const EMPTY_PROGRESS: Record<string, WordStat> = {};
 
 type Props = {
   level: LevelDef;
   band: AgeBand;
-  onWin: (stars: 1 | 2 | 3) => void;
+  hintsEnabled: boolean;
+  wordProgress?: Record<string, WordStat>;
+  onWin: (result: LevelWin) => void;
 };
 
 function shuffle<T>(arr: T[]): T[] {
@@ -36,9 +59,10 @@ function btnSize(band: AgeBand): number {
   return 70;
 }
 
-export function LevelPlay({ level, band, onWin }: Props) {
+function ArcadeLevel({ level, band, hintsEnabled, wordProgress = EMPTY_PROGRESS, onWin }: Props) {
   const t = useT();
   const [feedback, setFeedback] = useState<'idle' | 'good' | 'bad'>('idle');
+  const [coach, setCoach] = useState<string | null>(null);
   const [burst, setBurst] = useState(false);
   const [progress, setProgress] = useState(0);
   const [mistakes, setMistakes] = useState(0);
@@ -50,30 +74,74 @@ export function LevelPlay({ level, band, onWin }: Props) {
   const [pathLit, setPathLit] = useState<number[]>([]);
   const [memoryFlipped, setMemoryFlipped] = useState<number[]>([]);
   const [memoryMatched, setMemoryMatched] = useState<number[]>([]);
+  const [animalCursor, setAnimalCursor] = useState(0);
+  const [animalHelp, setAnimalHelp] = useState(false);
+  const [roundHelp, setRoundHelp] = useState(false);
+  const [countPhase, setCountPhase] = useState<'quantity' | 'model' | 'listen'>('quantity');
+  const [playSalt] = useState(() => Math.floor(Math.random() * 0x7fffffff));
   const pop = useSharedValue(1);
   const size = btnSize(band);
-  const showLabels = band !== '9-10' || level.template === 'shapeSort';
+  const settled = useRef(false);
+  const mistakesRef = useRef(0);
+  const comparingMemory = useRef(false);
+  const flippedRef = useRef<number[]>([]);
+  const matchedRef = useRef<number[]>([]);
+  const animalBusy = useRef(false);
+  const animalHelpUsed = useRef(false);
+  const animalMissed = useRef(false);
+  const roundBusy = useRef(false);
+  const roundHelpRef = useRef(false);
+  const roundMissRef = useRef(false);
+  const wordLog = useRef<WordAttempt[]>([]);
+  const promptOutcome = useRef<SpeakOutcome | null>(null);
+  const noteSpeech = (text: string, slow = false) => {
+    void speakKidPrompt(text, { lang: 'en', slow }).then((outcome) => {
+      if (outcome === 'played' || promptOutcome.current !== 'played') promptOutcome.current = outcome;
+    });
+  };
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   useEffect(() => {
+    settled.current = false;
+    mistakesRef.current = 0;
+    comparingMemory.current = false;
+    flippedRef.current = [];
+    matchedRef.current = [];
+    animalBusy.current = false;
+    animalHelpUsed.current = false;
+    animalMissed.current = false;
+    roundBusy.current = false;
+    roundHelpRef.current = false;
+    roundMissRef.current = false;
+    wordLog.current = [];
     setProgress(0);
     setMistakes(0);
     setSortDone([]);
     setActiveBin(0);
     setFeedback('idle');
+    setCoach(null);
     setBurst(false);
     setSeqStep(0);
     setPathStep(0);
     setPathLit([]);
     setMemoryFlipped([]);
     setMemoryMatched([]);
+    setAnimalCursor(0);
+    setAnimalHelp(false);
+    setRoundHelp(false);
+    return () => {
+      timers.current.forEach(clearTimeout);
+      timers.current = [];
+    };
   }, [level.id]);
 
   useEffect(() => {
+    if (ENGLISH_TEMPLATES.has(level.template)) return;
     void speakKidPrompt(level.prompt);
     return () => {
       void stopSpeaking();
     };
-  }, [level.id, level.prompt]);
+  }, [level.id, level.prompt, level.template]);
 
   useEffect(() => {
     if (!level.timerSec) return;
@@ -90,25 +158,61 @@ export function LevelPlay({ level, band, onWin }: Props) {
     return () => clearInterval(id);
   }, [level.id, level.timerSec]);
 
-  const targetColor = level.colors[0];
-  const targetShape = level.shapes[0];
-  const targetToken = level.shapeTokens[0];
   const need = Math.max(1, Math.min(level.targetCount, band === '3-5' ? 2 : 4));
   const optionN = band === '3-5' ? Math.min(level.optionCount, 3) : level.optionCount;
 
-  const colorOptions = useMemo(
-    () => shuffle(level.colors.slice(0, optionN)),
-    [level.id, level.colors, optionN],
-  );
-  const shapeOptions = useMemo(
-    () => shuffle(level.shapeTokens.slice(0, optionN)),
-    [level.id, level.shapeTokens, optionN],
-  );
+  const colorRounds = useMemo(() => colorRoundsFor(level, band, playSalt), [level, band, playSalt]);
+
+  const shapeRounds = useMemo(() => shapeRoundsFor(level, band, playSalt), [level, band, playSalt]);
+
+  const countRounds = useMemo(() => {
+    const counts = [1, 2, 3, 4, 5];
+    const questions = Math.max(1, Math.min(need, 3));
+    const targets = seededShuffle(counts, playSeed(level.id, playSalt, 31)).slice(0, questions);
+    return targets.map((count, question) => {
+      const near = seededShuffle(
+        counts.filter((n) => n !== count),
+        playSeed(level.id, playSalt, 80 + question),
+      ).slice(0, 2);
+      const choices = buildRounds([count, ...near], [count], playSeed(level.id, playSalt, 90 + question), (a, b) => a === b)[0]
+        ?.options ?? [count, ...near];
+      return {
+        count,
+        emoji: COUNT_EMOJI[question % COUNT_EMOJI.length] ?? '🍎',
+        choices,
+      };
+    });
+  }, [level.id, need, playSalt]);
+
+  const colorRound = colorRounds[Math.min(progress, Math.max(colorRounds.length - 1, 0))];
+  const shapeRound = shapeRounds[Math.min(progress, Math.max(shapeRounds.length - 1, 0))];
+  const countRound = countRounds[Math.min(progress, Math.max(countRounds.length - 1, 0))];
+  const countWord = COUNT_WORDS[countRound?.count ?? 0] ?? 'one';
+  const countWordLabel = countWord.charAt(0).toUpperCase() + countWord.slice(1);
+  const countListenChoices = useMemo(() => {
+    if (!countRound) return [];
+    const counts = [1, 2, 3, 4, 5];
+    const near = seededShuffle(
+      counts.filter((n) => n !== countRound.count),
+      playSeed(level.id, playSalt, 120 + progress),
+    ).slice(0, 2);
+    return (
+      buildRounds([countRound.count, ...near], [countRound.count], playSeed(level.id, playSalt, 140 + progress), (a, b) => a === b)[0]
+        ?.options ?? [countRound.count, ...near]
+    );
+  }, [countRound, level.id, playSalt, progress]);
+  const targetColor = colorRound?.target ?? level.colors[0];
+  const targetToken = shapeRound?.target ?? level.shapeTokens[0];
+  const targetShape = targetToken?.glyph ?? level.shapes[0];
+  const colorOptions = colorRound?.options ?? level.colors.slice(0, optionN);
+  const shapeOptions = shapeRound?.options ?? level.shapeTokens.slice(0, optionN);
+  const sizeAskBig = (level.findBigger !== false) === (progress % 2 === 0);
 
   const sequence = useMemo(() => {
     const n = band === '3-5' ? 2 : Math.min(3, optionN);
-    return level.colors.slice(0, n);
-  }, [level, band, optionN]);
+    const shift = progress % Math.max(level.colors.length, 1);
+    return Array.from({ length: Math.min(n, level.colors.length) }, (_, k) => level.colors[(shift + k) % level.colors.length]!);
+  }, [level.colors, band, optionN, progress]);
 
   const sequenceOptions = useMemo(() => shuffle(sequence), [sequence]);
 
@@ -119,15 +223,17 @@ export function LevelPlay({ level, band, onWin }: Props) {
   }, [level, band, optionN]);
 
   const sizeItems = useMemo(() => {
-    const sizes = band === '3-5' ? [1, 1.55] : [0.85, 1.15, 1.55];
-    const base = level.colors.slice(0, sizes.length);
+    const sizes = band === '3-5' ? [0.7, 1.45] : [0.62, 1.05, 1.55];
+    const color = level.colors[0] ?? '#FF6B6B';
+    const biggest = Math.max(...sizes);
+    const smallest = Math.min(...sizes);
     return shuffle(
-      base.map((c, i) => ({
+      sizes.map((scale, i) => ({
         id: i,
-        color: c,
-        scale: sizes[i] ?? 1,
-        isBiggest: (sizes[i] ?? 1) === Math.max(...sizes),
-        isSmallest: (sizes[i] ?? 1) === Math.min(...sizes),
+        color,
+        scale,
+        isBiggest: scale === biggest,
+        isSmallest: scale === smallest,
       })),
     );
   }, [level, band]);
@@ -172,12 +278,18 @@ export function LevelPlay({ level, band, onWin }: Props) {
     return shuffle(items);
   }, [level.id, level.colors, level.shapes, optionN, band]);
 
-  const animalOptions = useMemo(() => {
-    const n = band === '3-5' ? Math.min(3, Math.max(2, level.animals.length)) : Math.min(4, level.animals.length);
-    return shuffle(level.animals.slice(0, n));
-  }, [level.id, level.animals, band]);
+  const animalRounds = useMemo(
+    () => animalRoundsFor(level, band, playSalt, wordProgress),
+    [level, band, playSalt, wordProgress],
+  );
 
-  const targetAnimal = level.animals[0];
+  const animalGoal = Math.max(1, animalRounds.length);
+  const animalRound = animalRounds[Math.min(animalCursor, Math.max(animalRounds.length - 1, 0))];
+  const animalOptions = animalRound?.options ?? [];
+  const targetAnimal = animalRound?.target;
+  const animalPrompt = targetAnimal
+    ? `Find the ${tFor('en', targetAnimal.labelKey).toLowerCase()}.`
+    : level.prompt;
 
   const pathStones = useMemo(() => {
     const n = level.pathLength ?? (band === '6-8' ? 3 : 4);
@@ -211,9 +323,19 @@ export function LevelPlay({ level, band, onWin }: Props) {
     return shuffle(items);
   }, [level.id, level.findGridSize, level.animals, level.shapes, level.colors, band]);
 
+  const later = (fn: () => void, ms: number) => {
+    const id = setTimeout(fn, ms);
+    timers.current.push(id);
+  };
+
+  const locked = () => settled.current;
+
   const finish = () => {
-    const stars = starsFromMistakes(mistakes, band);
-    setTimeout(() => onWin(stars), 420);
+    if (settled.current) return;
+    settled.current = true;
+    const stars = starsFromMistakes(mistakesRef.current, band);
+    const payload: LevelWin = { stars, words: [...wordLog.current] };
+    later(() => onWin(payload), 420);
   };
 
   const flash = (ok: boolean) => {
@@ -224,18 +346,25 @@ export function LevelPlay({ level, band, onWin }: Props) {
       withSpring(1, { damping: 12, stiffness: 200 }),
     );
     if (ok) void speakPraise();
-    if (!ok) setMistakes((m) => m + 1);
+    if (!ok) {
+      mistakesRef.current += 1;
+      setMistakes(mistakesRef.current);
+      setCoach(t('level.modelHint'));
+    } else {
+      setCoach(null);
+    }
     setTimeout(() => {
       setFeedback('idle');
       setBurst(false);
     }, 520);
   };
 
-  const bumpProgress = () => {
+  const bumpProgress = (goal = need) => {
+    if (settled.current) return;
     setProgress((p) => {
-      if (p >= need) return p;
+      if (settled.current || p >= goal) return p;
       const next = p + 1;
-      if (next >= need) finish();
+      if (next >= goal) finish();
       return next;
     });
   };
@@ -244,21 +373,60 @@ export function LevelPlay({ level, band, onWin }: Props) {
     transform: [{ scale: pop.value }],
   }));
 
+  useEffect(() => {
+    roundBusy.current = false;
+    roundHelpRef.current = false;
+    roundMissRef.current = false;
+    setRoundHelp(false);
+    setCountPhase('quantity');
+  }, [level.id, progress, animalCursor]);
+
+  const logRound = (id: string, correct: boolean, skill: LearningSkill = 'listen-recognize') => {
+    if (!id || id === 'color.unknown') return;
+    wordLog.current.push({
+      id,
+      correct,
+      skill: skillAfterPrompt(skill, promptOutcome.current, promptHasStarted()),
+      independent: correct && !roundHelpRef.current && !roundMissRef.current,
+      firstTry: correct && !roundHelpRef.current && !roundMissRef.current,
+    });
+    if (!correct) {
+      roundMissRef.current = true;
+      roundHelpRef.current = true;
+      setRoundHelp(true);
+    }
+  };
+
   const onColor = (c: string) => {
+    if (locked() || roundBusy.current || !targetColor) return;
+    const wordId = colorId(targetColor);
     if (c === targetColor) {
+      roundBusy.current = true;
+      logRound(wordId, true);
       flash(true);
-      bumpProgress();
-    } else flash(false);
+      bumpProgress(Math.max(1, colorRounds.length));
+    } else {
+      logRound(wordId, false);
+      flash(false);
+    }
   };
 
   const onShape = (glyph: string) => {
+    if (locked() || roundBusy.current || !targetToken) return;
+    const wordId = targetToken.labelKey.replace(/^shape\./, '');
     if (glyph === targetShape) {
+      roundBusy.current = true;
+      logRound(wordId, true);
       flash(true);
-      bumpProgress();
-    } else flash(false);
+      bumpProgress(Math.max(1, shapeRounds.length));
+    } else {
+      logRound(wordId, false);
+      flash(false);
+    }
   };
 
   const onSeq = (c: string) => {
+    if (locked()) return;
     if (c === sequence[seqStep]) {
       flash(true);
       const next = seqStep + 1;
@@ -273,40 +441,80 @@ export function LevelPlay({ level, band, onWin }: Props) {
   };
 
   const onMemory = (index: number) => {
-    if (memoryMatched.includes(index) || memoryFlipped.includes(index)) return;
-    const next = [...memoryFlipped, index];
+    if (locked() || comparingMemory.current) return;
+    if (matchedRef.current.includes(index) || flippedRef.current.includes(index)) return;
+    const next = [...flippedRef.current, index];
+    if (next.length > 2) return;
+    flippedRef.current = next;
     setMemoryFlipped(next);
-    if (next.length === 2) {
-      const [a, b] = next;
-      if (memoryCards[a].color === memoryCards[b].color) {
-        flash(true);
-        const matched = [...memoryMatched, a, b];
-        setMemoryMatched(matched);
+    if (next.length < 2) return;
+    comparingMemory.current = true;
+    const [a, b] = next;
+    if (memoryCards[a].color === memoryCards[b].color) {
+      flash(true);
+      const matched = [...matchedRef.current, a, b];
+      matchedRef.current = matched;
+      setMemoryMatched(matched);
+      later(() => {
+        flippedRef.current = [];
         setMemoryFlipped([]);
-        if (matched.length >= memoryCards.length) finish();
-      } else {
-        flash(false);
-        setTimeout(() => setMemoryFlipped([]), 520);
-      }
+        comparingMemory.current = false;
+      }, 420);
+      if (matched.length >= memoryCards.length) finish();
+    } else {
+      flash(false);
+      later(() => {
+        flippedRef.current = [];
+        setMemoryFlipped([]);
+        comparingMemory.current = false;
+      }, 520);
     }
   };
 
   const onCount = (n: number) => {
-    if (n === need) {
+    if (locked() || roundBusy.current || !countRound || countPhase !== 'quantity') return;
+    if (n === countRound.count) {
+      roundBusy.current = true;
+      logRound(`count-${countRound.count}`, true, 'count-quantity');
       flash(true);
-      finish();
-    } else flash(false);
+      setCountPhase('model');
+      return;
+    }
+    logRound(`count-${countRound.count}`, false, 'count-quantity');
+    flash(false);
+  };
+
+  const onCountWord = (n: number) => {
+    if (locked() || roundBusy.current || !countRound || countPhase !== 'listen') return;
+    const wordId = COUNT_WORDS[countRound.count] ?? 'count';
+    if (n === countRound.count) {
+      roundBusy.current = true;
+      logRound(wordId, true, 'listen-recognize');
+      flash(true);
+      bumpProgress(Math.max(1, countRounds.length));
+      return;
+    }
+    logRound(wordId, false, 'listen-recognize');
+    flash(false);
   };
 
   const onSize = (item: (typeof sizeItems)[0]) => {
-    const ok = level.findBigger ? item.isBiggest : item.isSmallest;
+    if (locked() || roundBusy.current) return;
+    const wordId = sizeAskBig ? 'big' : 'small';
+    const ok = sizeAskBig ? item.isBiggest : item.isSmallest;
     if (ok) {
+      roundBusy.current = true;
+      logRound(wordId, true);
       flash(true);
       bumpProgress();
-    } else flash(false);
+    } else {
+      logRound(wordId, false);
+      flash(false);
+    }
   };
 
   const onPattern = (c: string) => {
+    if (locked()) return;
     if (c === level.patternAnswer) {
       flash(true);
       bumpProgress();
@@ -314,6 +522,7 @@ export function LevelPlay({ level, band, onWin }: Props) {
   };
 
   const onSortItem = (item: (typeof sortItems.items)[0]) => {
+    if (locked()) return;
     if (sortDone.includes(item.id)) return;
     if (item.bin === activeBin) {
       flash(true);
@@ -332,6 +541,7 @@ export function LevelPlay({ level, band, onWin }: Props) {
   };
 
   const onOdd = (odd: boolean) => {
+    if (locked()) return;
     if (odd) {
       flash(true);
       finish();
@@ -339,13 +549,45 @@ export function LevelPlay({ level, band, onWin }: Props) {
   };
 
   const onAnimal = (emoji: string) => {
-    if (emoji === targetAnimal?.emoji) {
+    if (locked() || animalBusy.current || !targetAnimal) return;
+    const wordId = targetAnimal.labelKey.replace(/^animal\./, '');
+    if (emoji === targetAnimal.emoji) {
+      animalBusy.current = true;
       flash(true);
-      bumpProgress();
-    } else flash(false);
+      wordLog.current.push({
+        id: wordId,
+        correct: true,
+        skill: skillAfterPrompt('listen-recognize', promptOutcome.current, promptHasStarted()),
+        independent: !animalHelpUsed.current,
+        firstTry: !animalMissed.current && !animalHelpUsed.current,
+      });
+      animalHelpUsed.current = false;
+      animalMissed.current = false;
+      setAnimalHelp(false);
+      setAnimalCursor((c) => c + 1);
+      bumpProgress(animalGoal);
+      later(() => {
+        animalBusy.current = false;
+      }, 480);
+    } else {
+      animalMissed.current = true;
+      animalHelpUsed.current = true;
+      setAnimalHelp(true);
+      wordLog.current.push({
+        id: wordId,
+        correct: false,
+        skill: skillAfterPrompt('listen-recognize', promptOutcome.current, promptHasStarted()),
+        independent: false,
+        firstTry: false,
+      });
+      flash(false);
+      const name = tFor('en', targetAnimal.labelKey);
+      noteSpeech(`${name}. This is a ${name.toLowerCase()}.`, true);
+    }
   };
 
   const onPath = (c: string) => {
+    if (locked()) return;
     if (c === pathStones[pathStep]) {
       flash(true);
       const lit = [...pathLit, pathStep];
@@ -364,6 +606,7 @@ export function LevelPlay({ level, band, onWin }: Props) {
   };
 
   const onQuickFind = (isTarget: boolean) => {
+    if (locked()) return;
     if (isTarget) {
       flash(true);
       finish();
@@ -372,6 +615,60 @@ export function LevelPlay({ level, band, onWin }: Props) {
 
   const softProgress = band === '3-5';
   const animalSize = band === '3-5' ? Math.max(size, 104) : size;
+  const memoryPairs = Math.max(1, memoryCards.length / 2);
+  const singleShot = level.template === 'quickFind' || level.template === 'oddOneOut';
+  const goal =
+    level.template === 'memory'
+      ? memoryPairs
+      : level.template === 'animalMatch'
+        ? animalGoal
+        : level.template === 'countCollect'
+          ? Math.max(1, countRounds.length)
+          : level.template === 'colorMatch'
+            ? Math.max(1, colorRounds.length)
+            : level.template === 'shapeSort'
+              ? Math.max(1, shapeRounds.length)
+              : singleShot
+                ? 1
+                : need;
+  const shownProgress = level.template === 'memory' ? memoryMatched.length / 2 : progress;
+  const shapeWord = targetToken ? tFor('en', targetToken.labelKey).toLowerCase() : 'shape';
+  const spokenPrompt =
+    level.template === 'animalMatch'
+      ? animalPrompt
+      : level.template === 'colorMatch'
+        ? `Find the ${colorName(targetColor, 'en')}.`
+        : level.template === 'shapeSort'
+          ? `Find the ${shapeWord}.`
+          : level.template === 'countCollect'
+            ? countPhase === 'model'
+              ? `${countWordLabel}.`
+              : countPhase === 'listen'
+                ? `Find ${countWord}.`
+                : 'How many?'
+            : level.template === 'sizeCompare'
+              ? sizeAskBig
+                ? 'Find the big one.'
+                : 'Find the small one.'
+              : level.template === 'sequence'
+                ? 'What comes next?'
+                : level.prompt;
+  const speakEnglish = ENGLISH_TEMPLATES.has(level.template);
+
+  useEffect(() => {
+    if (!speakEnglish) return;
+    resetPromptAudible();
+    promptOutcome.current = isVoiceNarrationEnabled() ? null : 'muted';
+    let live = true;
+    void speakKidPrompt(spokenPrompt, { lang: 'en' }).then((outcome) => {
+      if (!live) return;
+      if (outcome === 'played' || promptOutcome.current !== 'played') promptOutcome.current = outcome;
+    });
+    return () => {
+      live = false;
+      void stopSpeaking();
+    };
+  }, [level.id, spokenPrompt, speakEnglish, progress, animalCursor]);
 
   return (
     <Animated.View
@@ -390,25 +687,26 @@ export function LevelPlay({ level, band, onWin }: Props) {
       <SparkleBurst active={burst && feedback === 'bad'} tone="bad" count={6} />
 
       <Animated.Text entering={FadeIn} style={[styles.prompt, softProgress && styles.promptSoft]}>
-        {level.prompt}
+        {spokenPrompt}
       </Animated.Text>
+      <ListenBar text={spokenPrompt} lang={speakEnglish ? 'en' : undefined} />
 
       {level.timerSec ? (
         <View style={styles.timerPill}>
-          <Text style={[styles.timer, seconds < 8 && { color: colors.coral }]}>{t('common.seconds', { n: seconds })}</Text>
+          <Text style={[styles.timer, seconds < 8 && { color: colors.coralInk }]}>{t('common.seconds', { n: seconds })}</Text>
         </View>
       ) : null}
 
       {!softProgress ? (
         <Text style={styles.progress}>
-          {t('level.progress', { progress, need, reward: level.reward })}
+          {t('level.progress', { progress: shownProgress, need: goal, reward: level.reward })}
         </Text>
       ) : (
         <View style={styles.dotsRow}>
-          {Array.from({ length: need }).map((_, i) => (
+          {Array.from({ length: Math.max(1, Math.round(goal)) }).map((_, i) => (
             <View
               key={i}
-              style={[styles.progDot, i < progress && styles.progDotOn]}
+              style={[styles.progDot, i < shownProgress && styles.progDotOn]}
             />
           ))}
         </View>
@@ -419,7 +717,7 @@ export function LevelPlay({ level, band, onWin }: Props) {
           entering={ZoomIn.springify()}
           style={[styles.fb, feedback === 'good' ? styles.fbGood : styles.fbBad]}
         >
-          {feedback === 'good' ? t('level.feedbackGood') : t('level.feedbackBad')}
+          {feedback === 'good' ? t('level.feedbackGood') : coach ?? t('level.modelHint')}
         </Animated.Text>
       ) : (
         <View style={{ height: 32 }} />
@@ -427,45 +725,64 @@ export function LevelPlay({ level, band, onWin }: Props) {
 
       {level.template === 'colorMatch' ? (
         <View style={styles.grid}>
-          <Text style={styles.targetHint}>{t('level.target')}</Text>
-          <View
-            style={[
-              styles.swatch,
-              { backgroundColor: targetColor, width: size * 0.72, height: size * 0.72, alignSelf: 'center', marginBottom: 18 },
-            ]}
-          />
+          {roundHelp ? (
+            <View
+              style={[
+                styles.swatch,
+                { backgroundColor: targetColor, width: size * 0.72, height: size * 0.72, alignSelf: 'center', marginBottom: 8 },
+              ]}
+            />
+          ) : null}
+          {roundHelp && hintsEnabled ? (
+            <Text style={styles.targetHint}>{colorName(targetColor, 'tr')}</Text>
+          ) : null}
           <View style={styles.row}>
             {colorOptions.map((c) => (
-              <BouncePress
+              <Pressable
                 key={c}
+                accessibilityRole="button"
+                accessibilityLabel={colorName(c, 'en')}
                 onPress={() => onColor(c)}
                 style={[styles.swatchBig, { backgroundColor: c, width: size, height: size, borderRadius: size * 0.28 }]}
               />
             ))}
           </View>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              roundHelpRef.current = true;
+              setRoundHelp(true);
+              noteSpeech(spokenPrompt, true);
+            }}
+            style={styles.helpBtn}
+          >
+            <Text style={styles.helpText}>{t('level.help')}</Text>
+          </Pressable>
         </View>
       ) : null}
 
       {level.template === 'shapeSort' ? (
         <View style={styles.grid}>
-          <View style={styles.targetCard}>
-            <Text style={styles.shapeTextBig}>{targetShape}</Text>
-            {showLabels && targetToken ? (
-              <Text style={styles.targetHint}>{targetToken.label}</Text>
-            ) : null}
-          </View>
+          {roundHelp && targetToken ? (
+            <View style={styles.targetCard}>
+              <Text style={styles.shapeTextBig}>{targetToken.glyph}</Text>
+              {hintsEnabled ? (
+                <Text style={styles.targetHint}>{tFor('tr', targetToken.labelKey)}</Text>
+              ) : null}
+            </View>
+          ) : null}
           <View style={styles.row}>
             {shapeOptions.map((s, i) => {
               const fill = level.colors[i % level.colors.length];
               return (
                 <BouncePress
-                  key={s.glyph}
+                  key={`${progress}-${s.glyph}`}
                   onPress={() => onShape(s.glyph)}
                   style={[
                     styles.shapeBtn,
                     {
                       width: size,
-                      height: size + (showLabels ? 22 : 0),
+                      height: size,
                       minHeight: 64,
                       backgroundColor: fill,
                       borderColor: 'rgba(255,255,255,0.65)',
@@ -473,13 +790,21 @@ export function LevelPlay({ level, band, onWin }: Props) {
                   ]}
                 >
                   <Text style={[styles.shapeText, { color: colors.white }]}>{s.glyph}</Text>
-                  {showLabels ? (
-                    <Text style={[styles.shapeLabel, { color: colors.white }]}>{s.label}</Text>
-                  ) : null}
                 </BouncePress>
               );
             })}
           </View>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              roundHelpRef.current = true;
+              setRoundHelp(true);
+              noteSpeech(spokenPrompt, true);
+            }}
+            style={styles.helpBtn}
+          >
+            <Text style={styles.helpText}>{t('level.help')}</Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -535,22 +860,83 @@ export function LevelPlay({ level, band, onWin }: Props) {
         </View>
       ) : null}
 
-      {level.template === 'countCollect' ? (
+      {level.template === 'countCollect' && countRound ? (
         <View style={styles.grid}>
-          <Text style={styles.targetHint}>{t('level.pickCount', { n: need })}</Text>
-          <View style={styles.row}>
-            {[1, 2, 3, 4, 5]
-              .slice(0, band === '3-5' ? Math.max(3, need + 1) : Math.max(4, need + 1))
-              .map((n) => (
+          {countPhase === 'model' ? (
+            <View style={styles.targetCard}>
+              <Text style={styles.shapeTextBig}>{countWordLabel}</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  roundHelpRef.current = false;
+                  roundMissRef.current = false;
+                  roundBusy.current = false;
+                  setRoundHelp(false);
+                  setCountPhase('listen');
+                }}
+                style={styles.helpBtn}
+              >
+                <Text style={styles.helpText}>{t('level.heardIt')}</Text>
+              </Pressable>
+            </View>
+          ) : null}
+          {countPhase === 'quantity' ? (
+            <>
+              <View style={[styles.row, { marginBottom: 16 }]}>
+                {Array.from({ length: countRound.count }, (_, i) => (
+                  <Text key={`${progress}-q-${i}`} style={styles.countObject}>
+                    {countRound.emoji}
+                  </Text>
+                ))}
+              </View>
+              {roundHelp && hintsEnabled ? (
+                <Text style={styles.targetHint}>{COUNT_TR[countRound.count]}</Text>
+              ) : null}
+              <View style={styles.row}>
+                {countRound.choices.map((n) => (
+                  <BouncePress
+                    key={`${progress}-digit-${n}`}
+                    onPress={() => onCount(n)}
+                    style={[styles.countBtn, { width: size, height: size }]}
+                  >
+                    <Text style={styles.countText}>{n}</Text>
+                  </BouncePress>
+                ))}
+              </View>
+            </>
+          ) : null}
+          {countPhase === 'listen' ? (
+            <View style={styles.row}>
+              {countListenChoices.map((n) => (
                 <BouncePress
-                  key={n}
-                  onPress={() => onCount(n)}
-                  style={[styles.countBtn, { width: size, height: size }]}
+                  key={`${progress}-group-${n}`}
+                  onPress={() => onCountWord(n)}
+                  style={styles.countGroup}
                 >
-                  <Text style={styles.countText}>{n}</Text>
+                  <View style={styles.countCluster}>
+                    {Array.from({ length: n }, (_, i) => (
+                      <Text key={`${progress}-group-${n}-${i}`} style={styles.countPiece}>
+                        {countRound.emoji}
+                      </Text>
+                    ))}
+                  </View>
                 </BouncePress>
               ))}
-          </View>
+            </View>
+          ) : null}
+          {countPhase !== 'model' ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => {
+                roundHelpRef.current = true;
+                setRoundHelp(true);
+                noteSpeech(spokenPrompt, true);
+              }}
+              style={styles.helpBtn}
+            >
+              <Text style={styles.helpText}>{t('level.help')}</Text>
+            </Pressable>
+          ) : null}
         </View>
       ) : null}
 
@@ -558,22 +944,23 @@ export function LevelPlay({ level, band, onWin }: Props) {
         <View style={styles.grid}>
           <View style={[styles.row, { alignItems: 'flex-end', minHeight: size * 1.7 }]}>
             {sizeItems.map((item) => {
-              const s = size * 0.55 * item.scale;
+              const visual = shapePixelSize(item.scale);
+              const hit = Math.max(64, visual);
               return (
                 <BouncePress
                   key={item.id}
                   onPress={() => onSize(item)}
-                  style={[
-                    styles.swatchBig,
-                    {
+                  style={[styles.sizeHit, { width: hit, height: hit }]}
+                >
+                  <View
+                    style={{
                       backgroundColor: item.color,
-                      width: s,
-                      height: s,
-                      borderRadius: s * 0.28,
-                      marginHorizontal: 8,
-                    },
-                  ]}
-                />
+                      width: visual,
+                      height: visual,
+                      borderRadius: visual * 0.28,
+                    }}
+                  />
+                </BouncePress>
               );
             })}
           </View>
@@ -680,16 +1067,20 @@ export function LevelPlay({ level, band, onWin }: Props) {
 
       {level.template === 'animalMatch' && targetAnimal ? (
         <View style={styles.grid}>
-          <View style={styles.animalHero}>
-            <Text style={styles.animalHeroEmoji}>{targetAnimal.emoji}</Text>
-            {band !== '9-10' ? (
-              <Text style={styles.animalHeroLabel}>{targetAnimal.label}</Text>
-            ) : null}
-          </View>
+          {animalHelp ? (
+            <View style={styles.animalHero}>
+              <Text style={styles.animalHeroEmoji}>{targetAnimal.emoji}</Text>
+              {hintsEnabled ? (
+                <Text style={styles.animalHeroLabel}>{tFor('tr', targetAnimal.labelKey)}</Text>
+              ) : null}
+            </View>
+          ) : null}
           <View style={styles.row}>
             {animalOptions.map((a) => (
-              <BouncePress
-                key={a.emoji}
+              <Pressable
+                key={`${animalCursor}-${a.emoji}`}
+                accessibilityRole="button"
+                accessibilityLabel={tFor('en', a.labelKey)}
                 onPress={() => onAnimal(a.emoji)}
                 style={[
                   styles.animalCard,
@@ -701,9 +1092,20 @@ export function LevelPlay({ level, band, onWin }: Props) {
                 ]}
               >
                 <Text style={styles.animalCardEmoji}>{a.emoji}</Text>
-              </BouncePress>
+              </Pressable>
             ))}
           </View>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              animalHelpUsed.current = true;
+              setAnimalHelp(true);
+              noteSpeech(animalPrompt, true);
+            }}
+            style={styles.helpBtn}
+          >
+            <Text style={styles.helpText}>{t('level.help')}</Text>
+          </Pressable>
         </View>
       ) : null}
 
@@ -797,9 +1199,10 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     borderWidth: 3,
     borderColor: 'transparent',
-    minHeight: 280,
-    overflow: 'hidden',
+    overflow: 'visible',
   },
+  helpBtn: { alignSelf: 'center', marginTop: 14, minHeight: 44, justifyContent: 'center' },
+  helpText: { fontWeight: '800', color: colors.forest, fontSize: 16 },
   wrapGood: { backgroundColor: 'rgba(60,179,113,0.12)' },
   wrapBad: { backgroundColor: 'rgba(255,107,107,0.1)' },
   prompt: {
@@ -830,7 +1233,7 @@ const styles = StyleSheet.create({
   progDotOn: { backgroundColor: colors.forest },
   fb: { textAlign: 'center', marginTop: 10, fontWeight: '900', height: 32, fontSize: 18 },
   fbGood: { color: colors.forest },
-  fbBad: { color: colors.coral },
+  fbBad: { color: colors.coralInk },
   grid: { marginTop: 14 },
   targetHint: {
     textAlign: 'center',
@@ -910,6 +1313,27 @@ const styles = StyleSheet.create({
     minHeight: 64,
   },
   countText: { fontSize: 28, fontWeight: '900', color: colors.forestDeep },
+  countObject: { fontSize: 40, marginHorizontal: 4 },
+  countGroup: {
+    borderRadius: 18,
+    backgroundColor: colors.cream,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 10,
+    minWidth: 72,
+    minHeight: 72,
+  },
+  countCluster: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 2,
+    maxWidth: 132,
+  },
+  countPiece: { fontSize: 28, lineHeight: 34 },
+  sizeHit: { alignItems: 'center', justifyContent: 'center', marginHorizontal: 8 },
   binRow: { flexDirection: 'row', justifyContent: 'center', gap: 10, flexWrap: 'wrap' },
   bin: {
     width: 96,
@@ -1035,3 +1459,18 @@ const styles = StyleSheet.create({
   },
   quickCellEmoji: { fontSize: 28 },
 });
+
+export function LevelPlay(props: Props) {
+  if (props.level.lesson && props.level.lesson.length > 0) {
+    return (
+      <LessonPlay
+        key={props.level.id}
+        level={props.level}
+        band={props.band}
+        hintsEnabled={props.hintsEnabled}
+        onWin={props.onWin}
+      />
+    );
+  }
+  return <ArcadeLevel {...props} />;
+}
