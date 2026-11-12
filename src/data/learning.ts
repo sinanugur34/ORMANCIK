@@ -5,7 +5,7 @@ import { LEGACY_COLOR_IDS } from '../theme/colorNames';
 export type EnglishLevel = 'new' | 'some' | 'ready';
 
 /** What an entry actually measured. Counting is not the same as hearing the English word. */
-export type LearningSkill = 'listen-recognize' | 'picture-match' | 'count-quantity';
+export type LearningSkill = 'listen-recognize' | 'picture-match' | 'count-quantity' | 'prompt-incomplete';
 
 export type WordStat = {
   id: string;
@@ -44,10 +44,11 @@ export type LearningNote = {
   skill: LearningSkill;
 };
 
-export type PracticeResult = 'tried' | 'seen' | 'helped-seen' | 'solo' | 'helped';
+export type PracticeResult = 'tried' | 'seen' | 'helped-seen' | 'solo' | 'helped' | 'unfinished';
 
 /** Wrong answers stay wrong. Skill and help are read only after that. */
 export function practiceResult(note: Pick<LearningNote, 'correct' | 'independent' | 'skill'>): PracticeResult {
+  if (note.skill === 'prompt-incomplete') return note.correct ? 'unfinished' : 'tried';
   if (!note.correct) return 'tried';
   if (note.skill === 'picture-match') return note.independent ? 'seen' : 'helped-seen';
   return note.independent ? 'solo' : 'helped';
@@ -114,6 +115,10 @@ export function practiceDay(at: number, now = Date.now(), timeZone?: string): Pr
   return 'earlier';
 }
 
+/**
+ * A finished line, or an answer while that line is still playing, is listening.
+ * A line that was cut off or failed is not, even when some audio had already started.
+ */
 export function skillAfterPrompt(
   requested: LearningSkill,
   outcome: 'played' | 'muted' | 'failed' | 'cut' | 'started' | null,
@@ -121,14 +126,16 @@ export function skillAfterPrompt(
 ): LearningSkill {
   if (requested === 'count-quantity') return 'count-quantity';
   if (outcome === 'muted') return 'picture-match';
-  if (started || outcome === 'played' || outcome === 'started') return 'listen-recognize';
+  if (outcome === 'cut' || outcome === 'failed') return started ? 'prompt-incomplete' : 'picture-match';
+  if (outcome === 'played' || outcome === 'started' || started) return 'listen-recognize';
   return 'picture-match';
 }
 
 function heardSoFar(prev: WordStat | undefined): number {
   if (!prev) return 0;
   if (typeof prev.heardIndependent === 'number') return prev.heardIndependent;
-  return prev.skill === 'picture-match' ? 0 : prev.independent;
+  if (prev.skill === 'picture-match' || prev.skill === 'prompt-incomplete') return 0;
+  return prev.independent;
 }
 
 export function applyAttempt(
@@ -149,6 +156,7 @@ export function applyAttempt(
   };
   const correct = attempt.correct !== false;
   const skill = attempt.skill ?? base.skill;
+  const partial = skill === 'prompt-incomplete';
   const heardSkill = skill === 'listen-recognize';
   let independentDays = base.independentDays ?? 0;
   let lastIndependentDay = base.lastIndependentDay ?? 0;
@@ -178,11 +186,11 @@ export function applyAttempt(
     id: attempt.id,
     skill,
     attempts: base.attempts + 1,
-    independent: base.independent + (correct && attempt.independent ? 1 : 0),
-    hinted: base.hinted + (correct && !attempt.independent ? 1 : 0),
-    firstTry: base.firstTry + (correct && attempt.firstTry ? 1 : 0),
+    independent: base.independent + (correct && attempt.independent && !partial ? 1 : 0),
+    hinted: base.hinted + (correct && !attempt.independent && !partial ? 1 : 0),
+    firstTry: base.firstTry + (correct && attempt.firstTry && !partial ? 1 : 0),
     lastAt: now,
-    reviewAt: correct ? now + (attempt.independent ? 2 * DAY_MS : DAY_MS) : now,
+    reviewAt: correct && !partial ? now + (attempt.independent ? 2 * DAY_MS : DAY_MS) : correct ? now + DAY_MS : now,
     independentDays,
     lastIndependentDay,
     lastIndependentAt,
@@ -232,6 +240,7 @@ export function familyStatus(stat: WordStat): FamilyStatus {
   const heard = heardSoFar(stat);
   if ((stat.independentDays ?? 0) >= 2 && (stat.transferIndependent ?? 0) >= 1 && heard > 0) return 'recalled';
   if (heard > 0) return 'solo';
+  if (stat.skill === 'prompt-incomplete' && pictureIndependentCount(stat) > 0) return 'seen';
   if (stat.skill === 'picture-match' && (stat.independent > 0 || stat.hinted > 0)) return 'seen';
   if (stat.hinted > 0) return 'helped';
   return 'met';
@@ -249,7 +258,10 @@ function normalizeStat(id: string, stat: Partial<WordStat>): WordStat {
   return {
     id,
     skill:
-      stat.skill === 'count-quantity' || stat.skill === 'picture-match' || stat.skill === 'listen-recognize'
+      stat.skill === 'count-quantity' ||
+      stat.skill === 'picture-match' ||
+      stat.skill === 'listen-recognize' ||
+      stat.skill === 'prompt-incomplete'
         ? stat.skill
         : 'listen-recognize',
     independent: asCount(stat.independent),
@@ -317,7 +329,9 @@ export function appendLearningNotes(
     const id = canonicalWordId(attempt.id);
     if (!id || id === 'color.unknown' || id.startsWith('room.') || id.startsWith('count-')) continue;
     const skill: LearningSkill =
-      attempt.skill === 'picture-match' || attempt.skill === 'count-quantity' ? attempt.skill : 'listen-recognize';
+      attempt.skill === 'picture-match' || attempt.skill === 'count-quantity' || attempt.skill === 'prompt-incomplete'
+        ? attempt.skill
+        : 'listen-recognize';
     next.push({
       eventId: `${now.toString(36)}-${next.length.toString(36)}-${id}`,
       id,

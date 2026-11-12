@@ -425,6 +425,7 @@ export const tr = {
   'settings.statusSeen': 'Resme bakarak yaptı',
   'settings.statusHelpedSeen': 'Yardımla, resme bakarak yaptı',
   'settings.statusTried': 'Denedi, yeniden çalışacağız',
+  'settings.statusUnfinished': 'Yönerge bitmeden cevapladı',
   'settings.replayTitle': 'İlk dersler yeniden açılsın mı?',
   'settings.replayBody': 'Bu kayıt eski bir sürümden gelmiş olabilir. İlk sekiz ders yeniden açılır. Jetonlar, kıyafetler ve kelime kayıtları durur.',
   'settings.replayYes': 'İlk dersleri yeniden aç',

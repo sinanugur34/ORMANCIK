@@ -9,6 +9,7 @@
     "web": "expo start --web --port 43123",
     "tts:sample": "node scripts/tts-synthesize.mjs",
     "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
     "eas:login": "npx eas-cli@latest login",
     "eas:init": "npx eas-cli@latest init",
     "eas:configure": "npx eas-cli@latest build:configure",
@@ -50,6 +51,8 @@
   "devDependencies": {
     "@types/react": "~19.3.0",
     "babel-preset-expo": "^58.0.20",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "^58.0.4",
     "playwright": "^1.64.1",
     "typescript": "~6.0.3"
   },

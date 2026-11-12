@@ -1464,6 +1464,7 @@ export function LevelPlay(props: Props) {
   if (props.level.lesson && props.level.lesson.length > 0) {
     return (
       <LessonPlay
+        key={props.level.id}
         level={props.level}
         band={props.band}
         hintsEnabled={props.hintsEnabled}

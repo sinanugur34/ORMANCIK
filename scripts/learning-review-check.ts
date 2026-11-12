@@ -298,9 +298,38 @@ assert.equal(skillAfterPrompt('listen-recognize', 'failed'), 'picture-match');
 assert.equal(skillAfterPrompt('listen-recognize', 'cut'), 'picture-match');
 assert.equal(skillAfterPrompt('listen-recognize', 'played'), 'listen-recognize');
 assert.equal(skillAfterPrompt('listen-recognize', null, true), 'listen-recognize');
-assert.equal(skillAfterPrompt('listen-recognize', 'cut', true), 'listen-recognize');
+assert.equal(skillAfterPrompt('listen-recognize', 'played', true), 'listen-recognize');
+assert.equal(skillAfterPrompt('listen-recognize', 'cut', true), 'prompt-incomplete');
+assert.equal(skillAfterPrompt('listen-recognize', 'failed', true), 'prompt-incomplete');
 assert.equal(skillAfterPrompt('listen-recognize', 'muted', true), 'picture-match');
 assert.equal(skillAfterPrompt('count-quantity', 'muted'), 'count-quantity');
+const cutDog = applyAttempt(
+  undefined,
+  { id: 'dog', independent: true, firstTry: true, correct: true, skill: 'prompt-incomplete' },
+  8_000,
+);
+assert.equal(heardIndependentCount(cutDog), 0);
+assert.equal(cutDog.independent, 0);
+assert.equal(cutDog.attempts, 1);
+assert.equal(familyStatus(cutDog), 'met');
+assert.equal(knownWordIds({ dog: cutDog }, 9_000).includes('dog'), false);
+assert.equal(
+  practiceResult({ correct: true, independent: true, skill: 'prompt-incomplete' }),
+  'unfinished',
+);
+const picturedDog = applyAttempt(
+  undefined,
+  { id: 'dog', independent: true, firstTry: true, correct: true, skill: 'picture-match' },
+  8_000,
+);
+const picturedThenCut = applyAttempt(
+  picturedDog,
+  { id: 'dog', independent: true, firstTry: true, correct: true, skill: 'prompt-incomplete' },
+  9_000,
+);
+assert.equal(pictureIndependentCount(picturedThenCut), 1);
+assert.equal(familyStatus(picturedThenCut), 'seen');
+assert.equal(heardIndependentCount(picturedThenCut), 0);
 const older: Parameters<typeof applyAttempt>[0] = {
   id: 'cat',
   skill: 'listen-recognize',

@@ -43,10 +43,8 @@ type Props = {
 export function LessonPlay({ level, band, hintsEnabled, onWin }: Props) {
   const t = useT();
   const { width } = useWindowDimensions();
-  const heldSteps = useRef<{ id: number; steps: readonly LessonStep[] } | null>(null);
-  const held = holdLessonSteps(heldSteps.current, level.id, level.lesson ?? []);
-  heldSteps.current = held;
-  const steps = held.steps;
+  const [pinned] = useState(() => holdLessonSteps(null, level.id, level.lesson ?? []));
+  const steps = pinned.id === level.id ? pinned.steps : (level.lesson ?? []);
   const [index, setIndex] = useState(0);
   const [mistakes, setMistakes] = useState(0);
   const [helpOn, setHelpOn] = useState(false);
@@ -67,10 +65,6 @@ export function LessonPlay({ level, band, hintsEnabled, onWin }: Props) {
     helpUsed.current = false;
     missed.current = false;
     words.current = [];
-    setIndex(0);
-    setMistakes(0);
-    setHelpOn(false);
-    setFeedback('idle');
     return () => {
       timers.current.forEach(clearTimeout);
       timers.current = [];
@@ -80,8 +74,6 @@ export function LessonPlay({ level, band, hintsEnabled, onWin }: Props) {
 
   useEffect(() => {
     if (!step) return;
-    setHelpOn(false);
-    setFeedback('idle');
     stepBusy.current = false;
     helpUsed.current = false;
     missed.current = false;
@@ -115,7 +107,11 @@ export function LessonPlay({ level, band, hintsEnabled, onWin }: Props) {
     if (settled.current) return;
     const next = index + 1;
     if (next >= steps.length) finish();
-    else setIndex(next);
+    else {
+      setHelpOn(false);
+      setFeedback('idle');
+      setIndex(next);
+    }
   };
 
   const onModelContinue = () => {

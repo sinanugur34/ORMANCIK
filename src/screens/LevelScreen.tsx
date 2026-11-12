@@ -1,6 +1,6 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { LinearGradient } from 'expo-linear-gradient';
-import React, { useMemo, useRef, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Modal, ScrollView, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   FadeIn,
@@ -15,11 +15,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { speakKidPrompt } from '../audio/speakPrompt';
 import { AnimatedBackground } from '../components/AnimatedBackground';
 import { LevelPlay } from '../components/LevelPlay';
-import { BouncePress, FadeInView } from '../components/Motion';
+import { BouncePress } from '../components/Motion';
 import { PrimaryButton } from '../components/PrimaryButton';
 import { SparkleBurst } from '../components/SparkleBurst';
 import { knownWordIds } from '../data/learning';
-import { lessonVisit, type LessonVisit } from '../data/lessonVisit';
+import { lessonVisit } from '../data/lessonVisit';
 import { displayIslandName, islandForLevel } from '../data/islands';
 import { buildLevel } from '../data/levels';
 import { useT } from '../i18n';
@@ -105,11 +105,9 @@ export function LevelScreen({ navigation, route }: Props) {
     dismissSitting,
   } = useGame();
   const band = ageBand ?? '3-5';
-  const knownNow = useMemo(() => knownWordIds(wordProgress), [wordProgress]);
-  const visitKey = `${levelId}:${band}:${language}:${englishLevel}`;
-  const visitRef = useRef<LessonVisit | null>(null);
-  const visit = lessonVisit(visitRef.current, visitKey, knownNow);
-  visitRef.current = visit;
+  const [visit] = useState(() =>
+    lessonVisit(null, `${levelId}:${band}:${language}:${englishLevel}`, knownWordIds(wordProgress)),
+  );
   const level = useMemo(
     () => buildLevel(levelId, band, language, { englishLevel, knownIds: visit.knownIds }),
     [levelId, band, language, englishLevel, visit],

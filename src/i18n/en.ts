@@ -405,6 +405,7 @@ export const en: Record<TrKey, string> = {
   'settings.statusSeen': 'Matched the picture',
   'settings.statusHelpedSeen': 'Matched the picture with help',
   'settings.statusTried': 'Tried it; we will practice again',
+  'settings.statusUnfinished': 'Answered before the line finished',
   'settings.replayTitle': 'Open the first lessons again?',
   'settings.replayBody': 'This save may have come from an older version. The first eight lessons open again. Coins, clothes, and word records stay.',
   'settings.replayYes': 'Open the first lessons',

@@ -234,13 +234,15 @@ export function SettingsScreen({ navigation }: Props) {
       const statusKey =
         result === 'tried'
           ? 'settings.statusTried'
-          : result === 'seen'
-            ? 'settings.statusSeen'
-            : result === 'helped-seen'
-              ? 'settings.statusHelpedSeen'
-              : result === 'solo'
-                ? 'settings.statusSolo'
-                : 'settings.statusHelped';
+          : result === 'unfinished'
+            ? 'settings.statusUnfinished'
+            : result === 'seen'
+              ? 'settings.statusSeen'
+              : result === 'helped-seen'
+                ? 'settings.statusHelpedSeen'
+                : result === 'solo'
+                  ? 'settings.statusSolo'
+                  : 'settings.statusHelped';
       return [{ id: note.eventId, name, statusKey, day } as const];
     })
     .slice(0, 6);

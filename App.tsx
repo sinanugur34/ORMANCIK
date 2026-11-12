@@ -95,7 +95,12 @@ function RootNav() {
       <Stack.Screen name="ProfileSetup" component={ProfileSetupScreen} />
       <Stack.Screen name="Home" component={HomeScreen} />
       <Stack.Screen name="Map" component={MapScreen} options={{ animation: 'slide_from_right' }} />
-      <Stack.Screen name="Level" component={LevelScreen} options={{ animation: 'fade' }} />
+      <Stack.Screen
+        name="Level"
+        component={LevelScreen}
+        getId={({ params }) => String(params.levelId)}
+        options={{ animation: 'fade' }}
+      />
       <Stack.Screen name="PlayRoom" component={PlayRoomScreen} options={{ animation: 'fade' }} />
       <Stack.Screen name="Shop" component={ShopScreen} options={{ animation: 'slide_from_bottom' }} />
       <Stack.Screen name="Premium" component={PremiumScreen} options={{ animation: 'fade' }} />

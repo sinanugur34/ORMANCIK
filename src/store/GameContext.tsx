@@ -260,7 +260,10 @@ function learningDefaults(raw?: Partial<ChildProfile>): Pick<
             correct: note.correct !== false,
             independent: Boolean(note.independent),
             skill:
-              note.skill === 'picture-match' || note.skill === 'count-quantity' || note.skill === 'listen-recognize'
+              note.skill === 'picture-match' ||
+              note.skill === 'count-quantity' ||
+              note.skill === 'listen-recognize' ||
+              note.skill === 'prompt-incomplete'
                 ? note.skill
                 : 'listen-recognize',
           }))
