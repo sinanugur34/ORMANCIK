@@ -1,0 +1,15 @@
+TASLAK. Bu etiketler görüntünün içine gömülmez. Ayrı yazı katmanıdır.
+Yayınlanamaz. Bir video dosyasına bağlı değildir.
+
+Bird
+Bear
+Bunny
+Fox
+Hello
+Hello, bird
+Hello, bear
+Hello, bunny
+Hello, fox
+wings
+hop
+Goodbye
